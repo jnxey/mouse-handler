@@ -183,7 +183,7 @@ export default class UseMoveList {
     const currentX = currentXY.left + currentXY.moveX;
     const currentY = currentXY.top + currentXY.moveY;
     const currentKey = this.currentKey;
-    this.positions.forEach((position, key) => {
+    this.positionsCopy.forEach((position, key) => {
       if (currentKey !== key) {
         const _x = Math.abs(position.left - currentX);
         const _y = Math.abs(position.top - currentY);
@@ -191,7 +191,7 @@ export default class UseMoveList {
           console.log('重新排序：' + this.currentKey + '---to---' + key);
           delete currentXY.moveX;
           delete currentXY.moveY;
-          const next = this.positions[key];
+          const next = this.positionsCopy[key];
           // 当往前排时，替换的元素往前挪
           /** 对positions重新排序 **/
           if (currentKey < key) {

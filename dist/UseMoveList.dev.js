@@ -480,7 +480,7 @@
         var currentX = currentXY.left + currentXY.moveX;
         var currentY = currentXY.top + currentXY.moveY;
         var currentKey = this.currentKey;
-        this.positions.forEach(function (position, key) {
+        this.positionsCopy.forEach(function (position, key) {
           if (currentKey !== key) {
             var _x = Math.abs(position.left - currentX);
 
@@ -490,7 +490,7 @@
               console.log('重新排序：' + _this6.currentKey + '---to---' + key);
               delete currentXY.moveX;
               delete currentXY.moveY;
-              var next = _this6.positions[key]; // 当往前排时，替换的元素往前挪
+              var next = _this6.positionsCopy[key]; // 当往前排时，替换的元素往前挪
 
               /** 对positions重新排序 **/
 
