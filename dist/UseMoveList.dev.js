@@ -298,6 +298,7 @@
 
       this.moveTimer = null; // 移动排序后调整鼠标移动值
 
+      this.startELP = null;
       this.fixMouseX = 0;
       this.fixMouseY = 0;
       /*
@@ -381,6 +382,12 @@
             scopeY: [top, top + height]
           };
         });
+        this.positionsCopy = _toConsumableArray(this.positions);
+        var position = this.positions[this.currentKey];
+        this.startELP = {
+          top: position.top,
+          left: position.left
+        };
         this.setDomPosition();
       }
       /*
@@ -483,32 +490,29 @@
               console.log('重新排序：' + _this6.currentKey + '---to---' + key);
               delete currentXY.moveX;
               delete currentXY.moveY;
-              var next = _this6.positions[key];
-
-              var copyPositions = _toConsumableArray(_this6.positions); // 当往前排时，替换的元素往前挪
+              var next = _this6.positions[key]; // 当往前排时，替换的元素往前挪
 
               /** 对positions重新排序 **/
 
-
               if (currentKey < key) {
                 for (var i = currentKey + 1; i <= key; i++) {
-                  _this6.positions[i] = copyPositions[i - 1];
+                  _this6.positions[i] = _this6.positionsCopy[i - 1];
                 }
               } else {
                 // 当往后排时，替换的元素往后挪
                 for (var _i = key; _i < currentKey; _i++) {
-                  _this6.positions[_i] = copyPositions[_i + 1];
+                  _this6.positions[_i] = _this6.positionsCopy[_i + 1];
                 }
               }
 
               _this6.positions[currentKey] = _objectSpread2(_objectSpread2({}, next), {
                 moveX: currentX - next.left,
                 moveY: currentY - next.top
-              }); // 重置鼠标移动位置，、
+              }); // 重置鼠标移动位置，
               // 若是再次改变位置，移动位置出现
 
-              _this6.fixMouseX = currentXY.left - next.left;
-              _this6.fixMouseY = currentXY.top - next.top;
+              _this6.fixMouseX = _this6.startELP.left - next.left;
+              _this6.fixMouseY = _this6.startELP.top - next.top;
 
               _this6.resetQueneDom();
             }

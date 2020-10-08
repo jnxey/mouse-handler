@@ -19,6 +19,7 @@ export default class UseMoveList {
     // 移动中排序定时器
     this.moveTimer = null;
     // 移动排序后调整鼠标移动值
+    this.startELP = null;
     this.fixMouseX = 0;
     this.fixMouseY = 0;
     /*
@@ -83,6 +84,12 @@ export default class UseMoveList {
         scopeY: [top, top + height]
       };
     });
+    this.positionsCopy = [...this.positions];
+    const position = this.positions[this.currentKey];
+    this.startELP = {
+      top: position.top,
+      left: position.left
+    };
     this.setDomPosition();
   }
 
@@ -185,17 +192,16 @@ export default class UseMoveList {
           delete currentXY.moveX;
           delete currentXY.moveY;
           const next = this.positions[key];
-          const copyPositions = [...this.positions];
           // 当往前排时，替换的元素往前挪
           /** 对positions重新排序 **/
           if (currentKey < key) {
             for (let i = currentKey + 1; i <= key; i++) {
-              this.positions[i] = copyPositions[i - 1];
+              this.positions[i] = this.positionsCopy[i - 1];
             }
           } else {
             // 当往后排时，替换的元素往后挪
             for (let i = key; i < currentKey; i++) {
-              this.positions[i] = copyPositions[i + 1];
+              this.positions[i] = this.positionsCopy[i + 1];
             }
           }
           this.positions[currentKey] = {
@@ -205,10 +211,10 @@ export default class UseMoveList {
               moveY: currentY - next.top
             }
           };
-          // 重置鼠标移动位置，、
+          // 重置鼠标移动位置，
           // 若是再次改变位置，移动位置出现
-          this.fixMouseX = currentXY.left - next.left;
-          this.fixMouseY = currentXY.top - next.top;
+          this.fixMouseX = this.startELP.left - next.left;
+          this.fixMouseY = this.startELP.top - next.top;
           this.resetQueneDom();
         }
       }
