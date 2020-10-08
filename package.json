@@ -1,0 +1,26 @@
+{
+  "name": "mvvm",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:dev": "rollup -c",
+    "serve": "cross-env NODE_ENV=development rollup -c -w",
+    "lint": "eslint --ext .js,.ts src"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/core": "^7.11.1",
+    "@babel/preset-env": "^7.11.0",
+    "@rollup/plugin-alias": "^3.1.1",
+    "babel-eslint": "^10.1.0",
+    "cross-env": "^7.0.2",
+    "eslint": "^7.7.0",
+    "rollup": "^2.26.4",
+    "rollup-plugin-babel": "^4.4.0",
+    "rollup-plugin-eslint": "^7.0.0",
+    "rollup-plugin-serve": "^1.0.3"
+  }
+}
