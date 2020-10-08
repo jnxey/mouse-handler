@@ -16,6 +16,11 @@ export default class UseMoveList {
     else throw Error('el must be a Element');
     this.currentDom = null; // 当前变动位置的元素
     this.currentKey = null; // 当前变动位置的元素索引
+    // 移动中排序定时器
+    this.moveTimer = null;
+    // 移动排序后调整鼠标移动值
+    this.fixMouseX = 0;
+    this.fixMouseY = 0;
     /*
      * 设置需要进行排序的doms
      * 若是没有传入domlist，将会去wrap内的子元素
@@ -39,22 +44,24 @@ export default class UseMoveList {
       console.log(e);
       press = true;
       this.scrollBody.stop = true;
-      this.initDomList(); // 初始化DomList
       this.findElement(e.path);
+      this.initDomList(); // 初始化DomList
     };
     this.scrollBody.move = (e, start, end) => {
       // 监听移动，并变更移动块位置
       if (press) {
-        console.log(this.currentDom);
+        this.moveTimerHandler();
         this.setMovePosition(start, end);
       }
     };
     this.scrollBody.over = (e) => {
+      if (press) {
+        // 当鼠标松开时执行的方法
+        this.setFreeElement();
+      }
       press = false;
       this.scrollBody.stop = false;
     };
-    // 当前滑动位置
-    this.moveStyle = { top: 0, left: 0 };
   }
 
   /*
@@ -62,10 +69,18 @@ export default class UseMoveList {
    * */
   initDomList() {
     this.positions = this.domList.map((dom, key) => {
+      const top = dom.offsetTop;
+      const left = dom.offsetLeft;
+      const width = dom.clientWidth;
+      const height = dom.clientHeight;
       return {
-        initKey: key,
-        top: dom.offsetTop,
-        left: dom.offsetLeft
+        key,
+        top,
+        left,
+        width,
+        height,
+        scopeX: [left, left + width],
+        scopeY: [top, top + height]
       };
     });
     this.setDomPosition();
@@ -78,7 +93,7 @@ export default class UseMoveList {
     path.forEach((dom, key) => {
       if (dom.getAttribute && dom.getAttribute('name') === 'move-block') {
         this.currentDom = dom;
-        this.currentKey = dom.getAttribute('move-index');
+        this.currentKey = Number(dom.getAttribute('move-index'));
       }
     });
   }
@@ -87,10 +102,18 @@ export default class UseMoveList {
    * 设置doms位置
    * */
   setDomPosition() {
+    const currentKey = this.currentKey;
     setTimeout(() => {
       this.domList.forEach((dom, key) => {
         const postion = this.positions[key];
-        dom.style = `position:absolute;top:${postion.top}px;left:${postion.left}px;`;
+        dom.style = `
+          ${currentKey === key ? 'border-color:red;' : ''}
+          position:absolute;
+          top:${postion.top}px;
+          left:${postion.left}px;
+          transform:translate(0, 0);
+          z-index:100;
+        `;
       });
     }, 0);
   }
@@ -99,9 +122,119 @@ export default class UseMoveList {
    * 设置滑动位置
    * */
   setMovePosition(start, end) {
-    const moveX = end.x - start.x;
-    const moveY = end.y - start.y;
+    const moveX = end.x - start.x + this.fixMouseX;
+    const moveY = end.y - start.y + this.fixMouseY;
     const currentXY = this.positions[this.currentKey];
-    this.currentDom.style = `position:absolute;top:${currentXY.top + moveY}px;left:${currentXY.left + moveX}px;z-index: 100;`;
+    currentXY.moveX = moveX;
+    currentXY.moveY = moveY;
+    this.currentDom.style = `
+      border-color:red;
+      position:absolute;
+      top:${currentXY.top}px;
+      left:${currentXY.left}px;
+      transform:translate(${moveX}px, ${moveY}px);
+      z-index:200;
+    `;
+  }
+
+  /**
+   * 设置松开事件
+   */
+  setFreeElement() {
+    const currentXY = this.positions[this.currentKey];
+    const style = `
+      position:absolute;
+      top:${currentXY.top}px;
+      left:${currentXY.left}px;
+      transform:translate(0, 0);
+      z-index:100;
+    `;
+    this.currentDom.style = `
+      ${style}
+      transition: all 0.5s;
+    `;
+    setTimeout(() => {
+      this.currentDom.style = style;
+    }, 500);
+  }
+
+  /**
+   * 记录移动过程中的信息，并设置定时器，处理排序任务
+   */
+  moveTimerHandler(position) {
+    if (this.moveTimer) clearTimeout(this.moveTimer);
+    this.moveTimer = setTimeout(() => {
+      this.resetQuene();
+    }, 500);
+  }
+
+  /**
+   * 当鼠标停下超过500毫秒，将会判断是否触发排序
+   */
+  resetQuene() {
+    const currentXY = this.positions[this.currentKey];
+    const currentX = currentXY.left + currentXY.moveX;
+    const currentY = currentXY.top + currentXY.moveY;
+    const currentKey = this.currentKey;
+    this.positions.forEach((position, key) => {
+      if (currentKey !== key) {
+        const _x = Math.abs(position.left - currentX);
+        const _y = Math.abs(position.top - currentY);
+        if (_x <= 30 && _y <= 30) {
+          console.log('重新排序：' + this.currentKey + '---to---' + key);
+          delete currentXY.moveX;
+          delete currentXY.moveY;
+          const next = this.positions[key];
+          const copyPositions = [...this.positions];
+          // 当往前排时，替换的元素往前挪
+          /** 对positions重新排序 **/
+          if (currentKey < key) {
+            for (let i = currentKey + 1; i <= key; i++) {
+              this.positions[i] = copyPositions[i - 1];
+            }
+          } else {
+            // 当往后排时，替换的元素往后挪
+            for (let i = key; i < currentKey; i++) {
+              this.positions[i] = copyPositions[i + 1];
+            }
+          }
+          this.positions[currentKey] = {
+            ...next,
+            ...{
+              moveX: currentX - next.left,
+              moveY: currentY - next.top
+            }
+          };
+          // 重置鼠标移动位置，、
+          // 若是再次改变位置，移动位置出现
+          this.fixMouseX = currentXY.left - next.left;
+          this.fixMouseY = currentXY.top - next.top;
+          this.resetQueneDom();
+        }
+      }
+    });
+  }
+
+  /**
+   * 针对重新排的position设置位置
+   * 注：dom顺序不变，绝对定位变了
+   */
+  resetQueneDom() {
+    const currentKey = this.currentKey;
+    this.positions.forEach((position, key) => {
+      const dom = this.domList[key];
+      const style = `
+        ${currentKey === key ? 'border-color:red;' : ''}
+        position:absolute;
+        top:${position.top}px;
+        left:${position.left}px;
+        transform:translate(${position.moveX}px, ${position.moveY}px);
+        z-index:${currentKey === key ? '200' : '100'};
+      `;
+      dom.style = `${style}transition: all 0.5s;`;
+      setTimeout(() => {
+        dom.style = style;
+      }, 500);
+    });
   }
 }

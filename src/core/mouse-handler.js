@@ -101,7 +101,7 @@ export default class MouseHandler {
   // 断言当前是长按还是移动，
   assertPressOrMove() {
     const _x = Math.abs(this.startCoor.x - this.moveCoor.x);
-    const _y = Math.abs(this.startCoor.x - this.moveCoor.x);
+    const _y = Math.abs(this.startCoor.y - this.moveCoor.y);
     let isPress = false;
     if (_x <= ASSERT_MOVE && _y <= ASSERT_MOVE) {
       isPress = true;
