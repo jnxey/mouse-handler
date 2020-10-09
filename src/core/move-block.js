@@ -42,7 +42,6 @@ export default class UseMoveList {
     let press = false;
     this.scrollBody = new MouseHandler(options);
     this.scrollBody.press = (e) => {
-      console.log(e);
       press = true;
       this.scrollBody.stop = true;
       this.findElement(e.path);
@@ -58,7 +57,7 @@ export default class UseMoveList {
     this.scrollBody.over = (e) => {
       if (press) {
         // 当鼠标松开时执行的方法
-        this.setFreeElement();
+        this.moveOver();
       }
       press = false;
       this.scrollBody.stop = false;
@@ -113,14 +112,17 @@ export default class UseMoveList {
     setTimeout(() => {
       this.domList.forEach((dom, key) => {
         const postion = this.positions[key];
-        dom.style = `
-          ${currentKey === key ? 'border-color:red;' : ''}
+        dom.setAttribute(
+          'style',
+          `
+          ${currentKey === key ? 'border:1px solid red;' : ''}
           position:absolute;
           top:${postion.top}px;
           left:${postion.left}px;
           transform:translate(0, 0);
           z-index:100;
-        `;
+        `
+        );
       });
     }, 0);
   }
@@ -134,18 +136,29 @@ export default class UseMoveList {
     const currentXY = this.positions[this.currentKey];
     currentXY.moveX = moveX;
     currentXY.moveY = moveY;
-    this.currentDom.style = `
+    this.currentDom.setAttribute(
+      'style',
+      `
       border-color:red;
       position:absolute;
       top:${currentXY.top}px;
       left:${currentXY.left}px;
       transform:translate(${moveX}px, ${moveY}px);
       z-index:200;
-    `;
+    `
+    );
   }
 
   /**
    * 设置松开事件
+   */
+  moveOver() {
+    if (this.moveTimer) clearTimeout(this.moveTimer);
+    this.setFreeElement();
+  }
+
+  /**
+   * 解放元素
    */
   setFreeElement() {
     const currentXY = this.positions[this.currentKey];
@@ -156,12 +169,15 @@ export default class UseMoveList {
       transform:translate(0, 0);
       z-index:100;
     `;
-    this.currentDom.style = `
+    this.currentDom.setAttribute(
+      'style',
+      `
       ${style}
       transition: all 0.5s;
-    `;
+    `
+    );
     setTimeout(() => {
-      this.currentDom.style = style;
+      this.currentDom.setAttribute('style', style);
     }, 500);
   }
 
@@ -237,9 +253,14 @@ export default class UseMoveList {
         transform:translate(${position.moveX}px, ${position.moveY}px);
         z-index:${currentKey === key ? '200' : '100'};
       `;
-      dom.style = `${style}transition: all 0.5s;`;
+      dom.setAttribute(
+        'style',
+        `${style}
+        transition: all 0.5s;
+      `
+      );
       setTimeout(() => {
-        dom.style = style;
+        dom.setAttribute('style', style);
       }, 500);
     });
   }

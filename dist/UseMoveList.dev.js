@@ -331,7 +331,6 @@
         this.scrollBody = new MouseHandler(options);
 
         this.scrollBody.press = function (e) {
-          console.log(e);
           press = true;
           _this.scrollBody.stop = true;
 
@@ -353,7 +352,7 @@
         this.scrollBody.over = function (e) {
           if (press) {
             // 当鼠标松开时执行的方法
-            _this.setFreeElement();
+            _this.moveOver();
           }
 
           press = false;
@@ -419,7 +418,7 @@
         setTimeout(function () {
           _this3.domList.forEach(function (dom, key) {
             var postion = _this3.positions[key];
-            dom.style = "\n          ".concat(currentKey === key ? 'border-color:red;' : '', "\n          position:absolute;\n          top:").concat(postion.top, "px;\n          left:").concat(postion.left, "px;\n          transform:translate(0, 0);\n          z-index:100;\n        ");
+            dom.setAttribute('style', "\n          ".concat(currentKey === key ? 'border:1px solid red;' : '', "\n          position:absolute;\n          top:").concat(postion.top, "px;\n          left:").concat(postion.left, "px;\n          transform:translate(0, 0);\n          z-index:100;\n        "));
           });
         }, 0);
       }
@@ -435,10 +434,20 @@
         var currentXY = this.positions[this.currentKey];
         currentXY.moveX = moveX;
         currentXY.moveY = moveY;
-        this.currentDom.style = "\n      border-color:red;\n      position:absolute;\n      top:".concat(currentXY.top, "px;\n      left:").concat(currentXY.left, "px;\n      transform:translate(").concat(moveX, "px, ").concat(moveY, "px);\n      z-index:200;\n    ");
+        this.currentDom.setAttribute('style', "\n      border-color:red;\n      position:absolute;\n      top:".concat(currentXY.top, "px;\n      left:").concat(currentXY.left, "px;\n      transform:translate(").concat(moveX, "px, ").concat(moveY, "px);\n      z-index:200;\n    "));
       }
       /**
        * 设置松开事件
+       */
+
+    }, {
+      key: "moveOver",
+      value: function moveOver() {
+        if (this.moveTimer) clearTimeout(this.moveTimer);
+        this.setFreeElement();
+      }
+      /**
+       * 解放元素
        */
 
     }, {
@@ -448,9 +457,9 @@
 
         var currentXY = this.positions[this.currentKey];
         var style = "\n      position:absolute;\n      top:".concat(currentXY.top, "px;\n      left:").concat(currentXY.left, "px;\n      transform:translate(0, 0);\n      z-index:100;\n    ");
-        this.currentDom.style = "\n      ".concat(style, "\n      transition: all 0.5s;\n    ");
+        this.currentDom.setAttribute('style', "\n      ".concat(style, "\n      transition: all 0.5s;\n    "));
         setTimeout(function () {
-          _this4.currentDom.style = style;
+          _this4.currentDom.setAttribute('style', style);
         }, 500);
       }
       /**
@@ -533,9 +542,9 @@
         this.positions.forEach(function (position, key) {
           var dom = _this7.domList[key];
           var style = "\n        ".concat(currentKey === key ? 'border-color:red;' : '', "\n        position:absolute;\n        top:").concat(position.top, "px;\n        left:").concat(position.left, "px;\n        transform:translate(").concat(position.moveX, "px, ").concat(position.moveY, "px);\n        z-index:").concat(currentKey === key ? '200' : '100', ";\n      ");
-          dom.style = "".concat(style, "transition: all 0.5s;");
+          dom.setAttribute('style', "".concat(style, "\n        transition: all 0.5s;\n      "));
           setTimeout(function () {
-            dom.style = style;
+            dom.setAttribute('style', style);
           }, 500);
         });
       }
