@@ -8,11 +8,19 @@
   <body>
     <style>
       .wrap {
-        position: relative;
+        position: fixed;
+        top: 0;
+        left: 0;
         width: 600px;
         height: 600px;
         overflow-y: auto;
         font-size: 0;
+      }
+      .wrap .item-box {
+        position: relative;
+        display: inline-block;
+        width: 200px;
+        height: 100px;
       }
       .wrap .item {
         display: inline-block;
@@ -22,11 +30,16 @@
         border: 1px solid #000;
         background-color: #eee;
         -webkit-user-select: none;
+        overflow: hidden;
       }
     </style>
     <div id="app">
       <div class="wrap">
-        <div class="item" v-for="(item, key) in list" :key="item.name" name="move-block" :move-index="key">{{item.name}}</div>
+        <div v-for="(item, key) in list" :key="item.name" name="move-block-wp" class="item-box">
+          <div class="item" name="move-block" :move-index="key" :unid="item.name">
+            {{item.name}}
+          </div>
+        </div>
       </div>
     </div>
     <!-- js -->

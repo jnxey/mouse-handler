@@ -75,39 +75,17 @@
     return target;
   }
 
-  function _toConsumableArray(arr) {
-    return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _unsupportedIterableToArray(arr) || _nonIterableSpread();
-  }
+  var types = {};
+  var openLog = function openLog(type) {
+    types[type] = true;
+  };
+  var printLog = function printLog(message, type) {
+    if (types[type] || type === undefined) {
+      console.log(message);
+    }
+  };
 
-  function _arrayWithoutHoles(arr) {
-    if (Array.isArray(arr)) return _arrayLikeToArray(arr);
-  }
-
-  function _iterableToArray(iter) {
-    if (typeof Symbol !== "undefined" && Symbol.iterator in Object(iter)) return Array.from(iter);
-  }
-
-  function _unsupportedIterableToArray(o, minLen) {
-    if (!o) return;
-    if (typeof o === "string") return _arrayLikeToArray(o, minLen);
-    var n = Object.prototype.toString.call(o).slice(8, -1);
-    if (n === "Object" && o.constructor) n = o.constructor.name;
-    if (n === "Map" || n === "Set") return Array.from(o);
-    if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen);
-  }
-
-  function _arrayLikeToArray(arr, len) {
-    if (len == null || len > arr.length) len = arr.length;
-
-    for (var i = 0, arr2 = new Array(len); i < len; i++) arr2[i] = arr[i];
-
-    return arr2;
-  }
-
-  function _nonIterableSpread() {
-    throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
-  }
-
+  openLog('mouse-handler'); // 事件
   var ASSERT_MOVE = 20; // 断言长按与移动,px
 
   var ASSERT_PRESS = 300; // 断言点击长按,ms
@@ -135,8 +113,8 @@
        * 现在先分析 长按->拖拽 场景
        * */
 
-      this.el.addEventListener('mousedown', this.mousedown.bind(this));
-      this.el.addEventListener('mousemove', this.mousemove.bind(this)); // this.el.addEventListener('mouseup', this.mouseup.bind(this));
+      document.addEventListener('mousedown', this.mousedown.bind(this));
+      document.addEventListener('mousemove', this.mousemove.bind(this)); // this.el.addEventListener('mouseup', this.mouseup.bind(this));
 
       document.addEventListener('mouseup', this.mouseup.bind(this));
     } // 初始化值
@@ -186,7 +164,7 @@
         };
         setTimeout(function () {
           // 当超过断言值时
-          console.log('action------------------------' + _this.action);
+          printLog('action------------------------' + _this.action, 'mouse-handler');
 
           if (_this.action && _this.action !== 'up' && _this.assertPressOrMove().isPress) {
             _this.setScene('press');
@@ -254,14 +232,14 @@
     }, {
       key: "setScene",
       value: function setScene(scene) {
-        console.log('---------------------' + scene);
+        printLog('---------------------' + scene, 'mouse-handler');
         this.scene = scene;
       } // 设置当前动作
 
     }, {
       key: "setAction",
       value: function setAction(action) {
-        console.log('---------------------' + action);
+        printLog('---------------------' + action, 'mouse-handler');
         this.action = action;
       } // 一个事件的结束
 
@@ -275,6 +253,8 @@
 
     return MouseHandler;
   }();
+
+  openLog('move-block');
 
   var UseMoveList = /*#__PURE__*/function () {
     /*
@@ -296,11 +276,7 @@
       this.currentKey = null; // 当前变动位置的元素索引
       // 移动中排序定时器
 
-      this.moveTimer = null; // 移动排序后调整鼠标移动值
-
-      this.startELP = null;
-      this.fixMouseX = 0;
-      this.fixMouseY = 0;
+      this.moveTimer = null;
       /*
        * 设置需要进行排序的doms
        * 若是没有传入domlist，将会去wrap内的子元素
@@ -309,7 +285,7 @@
       if (options.domList instanceof Array) {
         this.domList = options.domList;
       } else {
-        this.domList = Array.prototype.map.call(this.el.children, function (item) {
+        this.domList = Array.prototype.map.call(this.el.querySelectorAll('[name=move-block]'), function (item) {
           return item;
         });
       }
@@ -328,17 +304,16 @@
         var _this = this;
 
         var press = false;
-        this.scrollBody = new MouseHandler(options);
+        this.scrollBody = new MouseHandler(options); // 长按动作
 
         this.scrollBody.press = function (e) {
           press = true;
           _this.scrollBody.stop = true;
 
-          _this.findElement(e.path);
+          _this.initDomList(e); // 初始化DomList
 
-          _this.initDomList(); // 初始化DomList
+        }; // 移动动作
 
-        };
 
         this.scrollBody.move = function (e, start, end) {
           // 监听移动，并变更移动块位置
@@ -347,7 +322,8 @@
 
             _this.setMovePosition(start, end);
           }
-        };
+        }; // 结束动作
+
 
         this.scrollBody.over = function (e) {
           if (press) {
@@ -365,28 +341,37 @@
 
     }, {
       key: "initDomList",
-      value: function initDomList() {
-        this.positions = this.domList.map(function (dom, key) {
-          var top = dom.offsetTop;
-          var left = dom.offsetLeft;
-          var width = dom.clientWidth;
-          var height = dom.clientHeight;
-          return {
-            key: key,
-            top: top,
-            left: left,
-            width: width,
-            height: height,
-            scopeX: [left, left + width],
-            scopeY: [top, top + height]
-          };
-        });
-        this.positionsCopy = _toConsumableArray(this.positions);
-        var position = this.positions[this.currentKey];
-        this.startELP = {
-          top: position.top,
-          left: position.left
-        };
+      value: function initDomList(e) {
+        /**
+         * 注意：这里的positions与domList的顺序可能不一致（根据y、x轴进行排序）
+         */
+        if (!this.positions) {
+          this.positions = this.domList.map(function (dom, key) {
+            var parent = dom.parentElement;
+            var top = parent.offsetTop;
+            var left = parent.offsetLeft;
+            var width = dom.clientWidth;
+            var height = dom.clientHeight;
+            var unid = dom.getAttribute('unid');
+            return {
+              unid: unid,
+              key: key,
+              top: top,
+              left: left,
+              width: width,
+              height: height,
+              scopeX: [left, left + width],
+              scopeY: [top, top + height],
+              translate: {
+                x: 0,
+                y: 0
+              }
+            };
+          });
+          this.resetPositions();
+        }
+
+        this.findElement(e.path);
         this.setDomPosition();
       }
       /*
@@ -401,26 +386,11 @@
         path.forEach(function (dom, key) {
           if (dom.getAttribute && dom.getAttribute('name') === 'move-block') {
             _this2.currentDom = dom;
-            _this2.currentKey = Number(dom.getAttribute('move-index'));
+            _this2.currentKey = _this2.positions.findIndex(function (v) {
+              return v.key === Number(dom.getAttribute('move-index'));
+            });
           }
         });
-      }
-      /*
-       * 设置doms位置
-       * */
-
-    }, {
-      key: "setDomPosition",
-      value: function setDomPosition() {
-        var _this3 = this;
-
-        var currentKey = this.currentKey;
-        setTimeout(function () {
-          _this3.domList.forEach(function (dom, key) {
-            var postion = _this3.positions[key];
-            dom.setAttribute('style', "\n          ".concat(currentKey === key ? 'border:1px solid red;' : '', "\n          position:absolute;\n          top:").concat(postion.top, "px;\n          left:").concat(postion.left, "px;\n          transform:translate(0, 0);\n          z-index:100;\n        "));
-          });
-        }, 0);
       }
       /*
        * 设置滑动位置
@@ -429,12 +399,13 @@
     }, {
       key: "setMovePosition",
       value: function setMovePosition(start, end) {
-        var moveX = end.x - start.x + this.fixMouseX;
-        var moveY = end.y - start.y + this.fixMouseY;
+        var moveX = end.x - start.x;
+        var moveY = end.y - start.y;
         var currentXY = this.positions[this.currentKey];
+        var translate = currentXY.moving || currentXY.translate;
         currentXY.moveX = moveX;
         currentXY.moveY = moveY;
-        this.currentDom.setAttribute('style', "\n      border-color:red;\n      position:absolute;\n      top:".concat(currentXY.top, "px;\n      left:").concat(currentXY.left, "px;\n      transform:translate(").concat(moveX, "px, ").concat(moveY, "px);\n      z-index:200;\n    "));
+        this.currentDom.setAttribute('style', "\n      border-color:red;\n      position:absolute;\n      top:0;\n      left:0;\n      transform:translate(".concat(translate.x + moveX, "px, ").concat(translate.y + moveY, "px);\n      z-index: 100;\n    "));
       }
       /**
        * 设置松开事件
@@ -446,6 +417,17 @@
         if (this.moveTimer) clearTimeout(this.moveTimer);
         this.setFreeElement();
       }
+      /*
+       * 设置开始移动doms位置
+       * */
+
+    }, {
+      key: "setDomPosition",
+      value: function setDomPosition() {
+        var currentXY = this.positions[this.currentKey];
+        var translate = currentXY.translate;
+        this.currentDom.setAttribute('style', "\n      border-color:red;\n      position:absolute;\n      top:0;\n      left:0;\n      transform:translate(".concat(translate.x, "px, ").concat(translate.y, "px);\n      z-index: 100;\n    "));
+      }
       /**
        * 解放元素
        */
@@ -453,13 +435,15 @@
     }, {
       key: "setFreeElement",
       value: function setFreeElement() {
-        var _this4 = this;
+        var _this3 = this;
 
         var currentXY = this.positions[this.currentKey];
-        var style = "\n      position:absolute;\n      top:".concat(currentXY.top, "px;\n      left:").concat(currentXY.left, "px;\n      transform:translate(0, 0);\n      z-index:100;\n    ");
-        this.currentDom.setAttribute('style', "\n      ".concat(style, "\n      transition: all 0.5s;\n    "));
+        var translate = currentXY.translate;
+        delete currentXY.moving;
+        var style = "\n      transform:translate(".concat(translate.x, "px, ").concat(translate.y, "px);\n    ");
+        this.currentDom.setAttribute('style', "\n      ".concat(style, "\n      border-color:red;\n      position:absolute;\n      top:0;\n      left:0;\n      transition: all 0.5s;\n      z-index: 100;\n    "));
         setTimeout(function () {
-          _this4.currentDom.setAttribute('style', style);
+          _this3.currentDom.setAttribute('style', style);
         }, 500);
       }
       /**
@@ -469,11 +453,11 @@
     }, {
       key: "moveTimerHandler",
       value: function moveTimerHandler(position) {
-        var _this5 = this;
+        var _this4 = this;
 
         if (this.moveTimer) clearTimeout(this.moveTimer);
         this.moveTimer = setTimeout(function () {
-          _this5.resetQuene();
+          _this4.resetQuene();
         }, 500);
       }
       /**
@@ -483,50 +467,84 @@
     }, {
       key: "resetQuene",
       value: function resetQuene() {
-        var _this6 = this;
+        var _this5 = this;
 
         var currentXY = this.positions[this.currentKey];
-        var currentX = currentXY.left + currentXY.moveX;
-        var currentY = currentXY.top + currentXY.moveY;
+        var currentTranslate = currentXY.moving || currentXY.translate;
+        var currentX = currentXY.left + currentXY.moveX + currentTranslate.x;
+        var currentY = currentXY.top + currentXY.moveY + currentTranslate.y;
         var currentKey = this.currentKey;
-        this.positionsCopy.forEach(function (position, key) {
+        this.positions.forEach(function (position, key) {
           if (currentKey !== key) {
-            var _x = Math.abs(position.left - currentX);
+            var translate = position.translate;
 
-            var _y = Math.abs(position.top - currentY);
+            var _x = Math.abs(position.left + translate.x - currentX);
+
+            var _y = Math.abs(position.top + translate.y - currentY);
 
             if (_x <= 30 && _y <= 30) {
-              console.log('重新排序：' + _this6.currentKey + '---to---' + key);
-              delete currentXY.moveX;
-              delete currentXY.moveY;
-              var next = _this6.positionsCopy[key]; // 当往前排时，替换的元素往前挪
+              printLog('重新排序：' + _this5.currentKey + '---to---' + key, 'move-block'); // 当往前排时，替换的元素往前挪
 
               /** 对positions重新排序 **/
 
+              var moveInfo = [];
+              moveInfo.push({
+                from: currentKey,
+                to: key,
+                translate: _objectSpread2({}, _this5.domToPosition(_this5.positions[currentKey], _this5.positions[key])),
+                moving: _objectSpread2({}, _this5.positions[currentKey].translate)
+              });
+
               if (currentKey < key) {
                 for (var i = currentKey + 1; i <= key; i++) {
-                  _this6.positions[i] = _this6.positionsCopy[i - 1];
+                  moveInfo.push({
+                    from: i,
+                    to: i - 1,
+                    translate: _objectSpread2({}, _this5.domToPosition(_this5.positions[i], _this5.positions[i - 1]))
+                  });
                 }
               } else {
                 // 当往后排时，替换的元素往后挪
                 for (var _i = key; _i < currentKey; _i++) {
-                  _this6.positions[_i] = _this6.positionsCopy[_i + 1];
+                  moveInfo.push({
+                    from: _i,
+                    to: _i - 1,
+                    translate: _objectSpread2({}, _this5.domToPosition(_this5.positions[_i], _this5.positions[_i + 1]))
+                  });
                 }
               }
 
-              _this6.positions[currentKey] = _objectSpread2(_objectSpread2({}, next), {
-                moveX: currentX - next.left,
-                moveY: currentY - next.top
-              }); // 重置鼠标移动位置，
-              // 若是再次改变位置，移动位置出现
+              moveInfo.forEach(function (move) {
+                var cur = _this5.positions[move.from];
+                if (move.moving) cur.moving = move.moving;
+                cur.translate = cur.translate;
+              }); // 排序动作
 
-              _this6.fixMouseX = _this6.startELP.left - next.left;
-              _this6.fixMouseY = _this6.startELP.top - next.top;
+              _this5.resetQueneDom(); // 重新对positions进行排序
 
-              _this6.resetQueneDom();
+
+              _this5.currentKey = key;
+
+              _this5.resetPositions();
+
+              console.log(_this5.positions);
             }
           }
         });
+      }
+      /**
+       * 移动一个元素到后一个的位置
+       */
+
+    }, {
+      key: "domToPosition",
+      value: function domToPosition(p1, p2) {
+        var x = p2.left + p2.translate.x - p1.left - p1.translate.x;
+        var y = p2.top + p2.translate.y - p1.top - p1.translate.y;
+        return {
+          x: x,
+          y: y
+        };
       }
       /**
        * 针对重新排的position设置位置
@@ -536,16 +554,33 @@
     }, {
       key: "resetQueneDom",
       value: function resetQueneDom() {
-        var _this7 = this;
+        var _this6 = this;
 
         var currentKey = this.currentKey;
         this.positions.forEach(function (position, key) {
-          var dom = _this7.domList[key];
-          var style = "\n        ".concat(currentKey === key ? 'border-color:red;' : '', "\n        position:absolute;\n        top:").concat(position.top, "px;\n        left:").concat(position.left, "px;\n        transform:translate(").concat(position.moveX, "px, ").concat(position.moveY, "px);\n        z-index:").concat(currentKey === key ? '200' : '100', ";\n      ");
+          if (currentKey === key) return;
+          var dom = _this6.domList[position.key];
+          var translate = position.translate;
+          var style = "\n        transform:translate(".concat(translate.x, "px, ").concat(translate.y, "px);\n      ");
           dom.setAttribute('style', "".concat(style, "\n        transition: all 0.5s;\n      "));
           setTimeout(function () {
             dom.setAttribute('style', style);
           }, 500);
+        });
+      }
+      /**
+       * 重新对positions进行排序
+       * 首先根据纵坐标排序，再进行横坐标排序
+       * 排序方式，从小到大
+       */
+
+    }, {
+      key: "resetPositions",
+      value: function resetPositions() {
+        this.positions = this.positions.sort(function (a, b) {
+          var ayx = ('0000000000' + (a.top + a.translate.y)).slice(-10) + ('0000000000' + (a.left + a.translate.x)).slice(-10);
+          var byx = ('0000000000' + (b.top + b.translate.y)).slice(-10) + ('0000000000' + (b.left + b.translate.x)).slice(-10);
+          return ayx > byx ? 1 : -1;
         });
       }
     }]);

@@ -1,18 +1,13 @@
+import { printLog, openLog } from './utils/utils';
+
+openLog('mouse-handler');
+
 // 事件
 const EVENT_TYPE = {
   click: 'click', // 点击事件
   press: 'press', // 长按事件
   pressEnd: 'pressEnd', // 长按结束
-  move: 'move' // 拖拽
-  // 放入插件去判断
-  // toTop: 'toTop', // 上滑
-  // toBottom: 'toBottom', // 下滑
-  // leftToRight: 'leftToRight', // 左->右
-  // rightToleft: 'rightToleft', // 右->左
-  // topEdge: 'topEdge', // 顶部边缘下滑
-  // bottomEdge: 'bottomEdge', // 底部边缘上滑
-  // leftEdge: 'leftEdge', // 左边缘右滑
-  // rightEdge: 'rightEdge', // 右边缘左滑
+  move: 'move' // 移动
 };
 
 const ASSERT_MOVE = 20; // 断言长按与移动,px
@@ -38,8 +33,8 @@ export default class MouseHandler {
      * --------------------
      * 现在先分析 长按->拖拽 场景
      * */
-    this.el.addEventListener('mousedown', this.mousedown.bind(this));
-    this.el.addEventListener('mousemove', this.mousemove.bind(this));
+    document.addEventListener('mousedown', this.mousedown.bind(this));
+    document.addEventListener('mousemove', this.mousemove.bind(this));
     // this.el.addEventListener('mouseup', this.mouseup.bind(this));
     document.addEventListener('mouseup', this.mouseup.bind(this));
   }
@@ -64,7 +59,7 @@ export default class MouseHandler {
     this.startCoor = { x: e.x, y: e.y };
     setTimeout(() => {
       // 当超过断言值时
-      console.log('action------------------------' + this.action);
+      printLog('action------------------------' + this.action, 'mouse-handler');
       if (this.action && this.action !== 'up' && this.assertPressOrMove().isPress) {
         this.setScene('press');
         if (typeof this.press === 'function') this.press(e);
@@ -111,13 +106,13 @@ export default class MouseHandler {
 
   // 设置当前场景
   setScene(scene) {
-    console.log('---------------------' + scene);
+    printLog('---------------------' + scene, 'mouse-handler');
     this.scene = scene;
   }
 
   // 设置当前动作
   setAction(action) {
-    console.log('---------------------' + action);
+    printLog('---------------------' + action, 'mouse-handler');
     this.action = action;
   }
 

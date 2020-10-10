@@ -1,4 +1,7 @@
+import { printLog, openLog, deepCopy } from './utils/utils';
 import MouseHandler from './mouse-handler';
+
+openLog('move-block');
 
 export default class UseMoveList {
   /*
@@ -18,10 +21,6 @@ export default class UseMoveList {
     this.currentKey = null; // 当前变动位置的元素索引
     // 移动中排序定时器
     this.moveTimer = null;
-    // 移动排序后调整鼠标移动值
-    this.startELP = null;
-    this.fixMouseX = 0;
-    this.fixMouseY = 0;
     /*
      * 设置需要进行排序的doms
      * 若是没有传入domlist，将会去wrap内的子元素
@@ -29,7 +28,10 @@ export default class UseMoveList {
     if (options.domList instanceof Array) {
       this.domList = options.domList;
     } else {
-      this.domList = Array.prototype.map.call(this.el.children, (item) => item);
+      this.domList = Array.prototype.map.call(
+        this.el.querySelectorAll('[name=move-block]'),
+        (item) => item
+      );
     }
     delete options.domList;
     /*
@@ -41,12 +43,13 @@ export default class UseMoveList {
   initMouse(options) {
     let press = false;
     this.scrollBody = new MouseHandler(options);
+    // 长按动作
     this.scrollBody.press = (e) => {
       press = true;
       this.scrollBody.stop = true;
-      this.findElement(e.path);
-      this.initDomList(); // 初始化DomList
+      this.initDomList(e); // 初始化DomList
     };
+    // 移动动作
     this.scrollBody.move = (e, start, end) => {
       // 监听移动，并变更移动块位置
       if (press) {
@@ -54,6 +57,7 @@ export default class UseMoveList {
         this.setMovePosition(start, end);
       }
     };
+    // 结束动作
     this.scrollBody.over = (e) => {
       if (press) {
         // 当鼠标松开时执行的方法
@@ -67,28 +71,36 @@ export default class UseMoveList {
   /*
    * 初始化元素的位置信息
    * */
-  initDomList() {
-    this.positions = this.domList.map((dom, key) => {
-      const top = dom.offsetTop;
-      const left = dom.offsetLeft;
-      const width = dom.clientWidth;
-      const height = dom.clientHeight;
-      return {
-        key,
-        top,
-        left,
-        width,
-        height,
-        scopeX: [left, left + width],
-        scopeY: [top, top + height]
-      };
-    });
-    this.positionsCopy = [...this.positions];
-    const position = this.positions[this.currentKey];
-    this.startELP = {
-      top: position.top,
-      left: position.left
-    };
+  initDomList(e) {
+    /**
+     * 注意：这里的positions与domList的顺序可能不一致（根据y、x轴进行排序）
+     */
+    if (!this.positions) {
+      this.positions = this.domList.map((dom, key) => {
+        const parent = dom.parentElement;
+        const top = parent.offsetTop;
+        const left = parent.offsetLeft;
+        const width = dom.clientWidth;
+        const height = dom.clientHeight;
+        const unid = dom.getAttribute('unid');
+        return {
+          unid,
+          key,
+          top,
+          left,
+          width,
+          height,
+          scopeX: [left, left + width],
+          scopeY: [top, top + height],
+          translate: {
+            x: 0,
+            y: 0
+          }
+        };
+      });
+      this.resetPositions();
+    }
+    this.findElement(e.path);
     this.setDomPosition();
   }
 
@@ -99,41 +111,21 @@ export default class UseMoveList {
     path.forEach((dom, key) => {
       if (dom.getAttribute && dom.getAttribute('name') === 'move-block') {
         this.currentDom = dom;
-        this.currentKey = Number(dom.getAttribute('move-index'));
+        this.currentKey = this.positions.findIndex(
+          (v) => v.key === Number(dom.getAttribute('move-index'))
+        );
       }
     });
-  }
-
-  /*
-   * 设置doms位置
-   * */
-  setDomPosition() {
-    const currentKey = this.currentKey;
-    setTimeout(() => {
-      this.domList.forEach((dom, key) => {
-        const postion = this.positions[key];
-        dom.setAttribute(
-          'style',
-          `
-          ${currentKey === key ? 'border:1px solid red;' : ''}
-          position:absolute;
-          top:${postion.top}px;
-          left:${postion.left}px;
-          transform:translate(0, 0);
-          z-index:100;
-        `
-        );
-      });
-    }, 0);
   }
 
   /*
    * 设置滑动位置
    * */
   setMovePosition(start, end) {
-    const moveX = end.x - start.x + this.fixMouseX;
-    const moveY = end.y - start.y + this.fixMouseY;
+    const moveX = end.x - start.x;
+    const moveY = end.y - start.y;
     const currentXY = this.positions[this.currentKey];
+    const translate = currentXY.moving || currentXY.translate;
     currentXY.moveX = moveX;
     currentXY.moveY = moveY;
     this.currentDom.setAttribute(
@@ -141,10 +133,10 @@ export default class UseMoveList {
       `
       border-color:red;
       position:absolute;
-      top:${currentXY.top}px;
-      left:${currentXY.left}px;
-      transform:translate(${moveX}px, ${moveY}px);
-      z-index:200;
+      top:0;
+      left:0;
+      transform:translate(${translate.x + moveX}px, ${translate.y + moveY}px);
+      z-index: 100;
     `
     );
   }
@@ -157,23 +149,45 @@ export default class UseMoveList {
     this.setFreeElement();
   }
 
+  /*
+   * 设置开始移动doms位置
+   * */
+  setDomPosition() {
+    const currentXY = this.positions[this.currentKey];
+    const translate = currentXY.translate;
+    this.currentDom.setAttribute(
+      'style',
+      `
+      border-color:red;
+      position:absolute;
+      top:0;
+      left:0;
+      transform:translate(${translate.x}px, ${translate.y}px);
+      z-index: 100;
+    `
+    );
+  }
+
   /**
    * 解放元素
    */
   setFreeElement() {
     const currentXY = this.positions[this.currentKey];
+    const translate = currentXY.translate;
+    delete currentXY.moving;
     const style = `
-      position:absolute;
-      top:${currentXY.top}px;
-      left:${currentXY.left}px;
-      transform:translate(0, 0);
-      z-index:100;
+      transform:translate(${translate.x}px, ${translate.y}px);
     `;
     this.currentDom.setAttribute(
       'style',
       `
       ${style}
+      border-color:red;
+      position:absolute;
+      top:0;
+      left:0;
       transition: all 0.5s;
+      z-index: 100;
     `
     );
     setTimeout(() => {
@@ -196,45 +210,70 @@ export default class UseMoveList {
    */
   resetQuene() {
     const currentXY = this.positions[this.currentKey];
-    const currentX = currentXY.left + currentXY.moveX;
-    const currentY = currentXY.top + currentXY.moveY;
+    const currentTranslate = currentXY.moving || currentXY.translate;
+    const currentX = currentXY.left + currentXY.moveX + currentTranslate.x;
+    const currentY = currentXY.top + currentXY.moveY + currentTranslate.y;
     const currentKey = this.currentKey;
-    this.positionsCopy.forEach((position, key) => {
+    this.positions.forEach((position, key) => {
       if (currentKey !== key) {
-        const _x = Math.abs(position.left - currentX);
-        const _y = Math.abs(position.top - currentY);
+        const translate = position.translate;
+        const _x = Math.abs(position.left + translate.x - currentX);
+        const _y = Math.abs(position.top + translate.y - currentY);
         if (_x <= 30 && _y <= 30) {
-          console.log('重新排序：' + this.currentKey + '---to---' + key);
-          delete currentXY.moveX;
-          delete currentXY.moveY;
-          const next = this.positionsCopy[key];
+          printLog('重新排序：' + this.currentKey + '---to---' + key, 'move-block');
           // 当往前排时，替换的元素往前挪
           /** 对positions重新排序 **/
+          let moveInfo = [];
+          moveInfo.push({
+            from: currentKey,
+            to: key,
+            translate: { ...this.domToPosition(this.positions[currentKey], this.positions[key]) },
+            moving: { ...this.positions[currentKey].translate }
+          });
           if (currentKey < key) {
             for (let i = currentKey + 1; i <= key; i++) {
-              this.positions[i] = this.positionsCopy[i - 1];
+              moveInfo.push({
+                from: i,
+                to: i - 1,
+                translate: { ...this.domToPosition(this.positions[i], this.positions[i - 1]) }
+              });
             }
           } else {
             // 当往后排时，替换的元素往后挪
             for (let i = key; i < currentKey; i++) {
-              this.positions[i] = this.positionsCopy[i + 1];
+              moveInfo.push({
+                from: i,
+                to: i - 1,
+                translate: { ...this.domToPosition(this.positions[i], this.positions[i + 1]) }
+              });
             }
           }
-          this.positions[currentKey] = {
-            ...next,
-            ...{
-              moveX: currentX - next.left,
-              moveY: currentY - next.top
-            }
-          };
-          // 重置鼠标移动位置，
-          // 若是再次改变位置，移动位置出现
-          this.fixMouseX = this.startELP.left - next.left;
-          this.fixMouseY = this.startELP.top - next.top;
+          moveInfo.forEach((move) => {
+            const cur = this.positions[move.from];
+            if (move.moving) cur.moving = move.moving;
+            cur.translate = cur.translate;
+          });
+          // 排序动作
           this.resetQueneDom();
+          // 重新对positions进行排序
+          this.currentKey = key;
+          this.resetPositions();
+          console.log(this.positions);
         }
       }
     });
+  }
+
+  /**
+   * 移动一个元素到后一个的位置
+   */
+  domToPosition(p1, p2) {
+    const x = p2.left + p2.translate.x - p1.left - p1.translate.x;
+    const y = p2.top + p2.translate.y - p1.top - p1.translate.y;
+    return {
+      x,
+      y
+    };
   }
 
   /**
@@ -244,14 +283,11 @@ export default class UseMoveList {
   resetQueneDom() {
     const currentKey = this.currentKey;
     this.positions.forEach((position, key) => {
-      const dom = this.domList[key];
+      if (currentKey === key) return;
+      const dom = this.domList[position.key];
+      const translate = position.translate;
       const style = `
-        ${currentKey === key ? 'border-color:red;' : ''}
-        position:absolute;
-        top:${position.top}px;
-        left:${position.left}px;
-        transform:translate(${position.moveX}px, ${position.moveY}px);
-        z-index:${currentKey === key ? '200' : '100'};
+        transform:translate(${translate.x}px, ${translate.y}px);
       `;
       dom.setAttribute(
         'style',
@@ -262,6 +298,23 @@ export default class UseMoveList {
       setTimeout(() => {
         dom.setAttribute('style', style);
       }, 500);
+    });
+  }
+
+  /**
+   * 重新对positions进行排序
+   * 首先根据纵坐标排序，再进行横坐标排序
+   * 排序方式，从小到大
+   */
+  resetPositions() {
+    this.positions = this.positions.sort(function (a, b) {
+      const ayx =
+        ('0000000000' + (a.top + a.translate.y)).slice(-10) +
+        ('0000000000' + (a.left + a.translate.x)).slice(-10);
+      const byx =
+        ('0000000000' + (b.top + b.translate.y)).slice(-10) +
+        ('0000000000' + (b.left + b.translate.x)).slice(-10);
+      return ayx > byx ? 1 : -1;
     });
   }
 }
