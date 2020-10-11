@@ -223,35 +223,11 @@ export default class UseMoveList {
           printLog('重新排序：' + this.currentKey + '---to---' + key, 'move-block');
           // 当往前排时，替换的元素往前挪
           /** 对positions重新排序 **/
-          let moveInfo = [];
-          moveInfo.push({
-            from: currentKey,
-            to: key,
-            translate: { ...this.domToPosition(this.positions[currentKey], this.positions[key]) },
-            moving: { ...this.positions[currentKey].translate }
-          });
-          if (currentKey < key) {
-            for (let i = currentKey + 1; i <= key; i++) {
-              moveInfo.push({
-                from: i,
-                to: i - 1,
-                translate: { ...this.domToPosition(this.positions[i], this.positions[i - 1]) }
-              });
-            }
-          } else {
-            // 当往后排时，替换的元素往后挪
-            for (let i = key; i < currentKey; i++) {
-              moveInfo.push({
-                from: i,
-                to: i - 1,
-                translate: { ...this.domToPosition(this.positions[i], this.positions[i + 1]) }
-              });
-            }
-          }
+          const moveInfo = this.cacheChangePositions(currentKey, key, this.positions);
           moveInfo.forEach((move) => {
-            const cur = this.positions[move.from];
-            if (move.moving) cur.moving = move.moving;
-            cur.translate = cur.translate;
+            console.log(move);
+            if (move.moving) this.positions[move.from].moving = move.moving;
+            this.positions[move.from].translate = move.translate;
           });
           // 排序动作
           this.resetQueneDom();
@@ -265,15 +241,45 @@ export default class UseMoveList {
   }
 
   /**
+   * 缓存位置变更信息
+   */
+  cacheChangePositions(currentKey, key, positions) {
+    let moveInfo = [];
+    moveInfo.push({
+      from: currentKey,
+      to: key,
+      translate: { ...this.domToPosition(positions[currentKey], positions[key]) },
+      moving: { ...positions[currentKey].translate }
+    });
+    if (currentKey < key) {
+      // 当往前排时，currentKey - key 的元素往前挪
+      for (let i = currentKey + 1; i <= key; i++) {
+        moveInfo.push({
+          from: i,
+          to: i - 1,
+          translate: { ...this.domToPosition(positions[i], positions[i - 1]) }
+        });
+      }
+    } else {
+      // 当往后排时，key - currentKey 的元素往后挪
+      for (let i = key; i < currentKey; i++) {
+        moveInfo.push({
+          from: i,
+          to: i - 1,
+          translate: { ...this.domToPosition(positions[i], positions[i + 1]) }
+        });
+      }
+    }
+    return moveInfo;
+  }
+
+  /**
    * 移动一个元素到后一个的位置
    */
   domToPosition(p1, p2) {
-    const x = p2.left + p2.translate.x - p1.left - p1.translate.x;
-    const y = p2.top + p2.translate.y - p1.top - p1.translate.y;
-    return {
-      x,
-      y
-    };
+    const x = p2.left + p2.translate.x - p1.left;
+    const y = p2.top + p2.translate.y - p1.top;
+    return { x, y };
   }
 
   /**

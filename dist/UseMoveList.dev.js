@@ -487,37 +487,12 @@
 
               /** 对positions重新排序 **/
 
-              var moveInfo = [];
-              moveInfo.push({
-                from: currentKey,
-                to: key,
-                translate: _objectSpread2({}, _this5.domToPosition(_this5.positions[currentKey], _this5.positions[key])),
-                moving: _objectSpread2({}, _this5.positions[currentKey].translate)
-              });
-
-              if (currentKey < key) {
-                for (var i = currentKey + 1; i <= key; i++) {
-                  moveInfo.push({
-                    from: i,
-                    to: i - 1,
-                    translate: _objectSpread2({}, _this5.domToPosition(_this5.positions[i], _this5.positions[i - 1]))
-                  });
-                }
-              } else {
-                // 当往后排时，替换的元素往后挪
-                for (var _i = key; _i < currentKey; _i++) {
-                  moveInfo.push({
-                    from: _i,
-                    to: _i - 1,
-                    translate: _objectSpread2({}, _this5.domToPosition(_this5.positions[_i], _this5.positions[_i + 1]))
-                  });
-                }
-              }
+              var moveInfo = _this5.cacheChangePositions(currentKey, key, _this5.positions);
 
               moveInfo.forEach(function (move) {
-                var cur = _this5.positions[move.from];
-                if (move.moving) cur.moving = move.moving;
-                cur.translate = cur.translate;
+                console.log(move);
+                if (move.moving) _this5.positions[move.from].moving = move.moving;
+                _this5.positions[move.from].translate = move.translate;
               }); // 排序动作
 
               _this5.resetQueneDom(); // 重新对positions进行排序
@@ -533,14 +508,51 @@
         });
       }
       /**
+       * 缓存位置变更信息
+       */
+
+    }, {
+      key: "cacheChangePositions",
+      value: function cacheChangePositions(currentKey, key, positions) {
+        var moveInfo = [];
+        moveInfo.push({
+          from: currentKey,
+          to: key,
+          translate: _objectSpread2({}, this.domToPosition(positions[currentKey], positions[key])),
+          moving: _objectSpread2({}, positions[currentKey].translate)
+        });
+
+        if (currentKey < key) {
+          // 当往前排时，currentKey - key 的元素往前挪
+          for (var i = currentKey + 1; i <= key; i++) {
+            moveInfo.push({
+              from: i,
+              to: i - 1,
+              translate: _objectSpread2({}, this.domToPosition(positions[i], positions[i - 1]))
+            });
+          }
+        } else {
+          // 当往后排时，key - currentKey 的元素往后挪
+          for (var _i = key; _i < currentKey; _i++) {
+            moveInfo.push({
+              from: _i,
+              to: _i - 1,
+              translate: _objectSpread2({}, this.domToPosition(positions[_i], positions[_i + 1]))
+            });
+          }
+        }
+
+        return moveInfo;
+      }
+      /**
        * 移动一个元素到后一个的位置
        */
 
     }, {
       key: "domToPosition",
       value: function domToPosition(p1, p2) {
-        var x = p2.left + p2.translate.x - p1.left - p1.translate.x;
-        var y = p2.top + p2.translate.y - p1.top - p1.translate.y;
+        var x = p2.left + p2.translate.x - p1.left;
+        var y = p2.top + p2.translate.y - p1.top;
         return {
           x: x,
           y: y
