@@ -1,4 +1,4 @@
-import { printLog, openLog, deepCopy } from './utils/utils';
+import { printLog, openLog, deepCopy } from './log';
 import MouseHandler from './mouse-handler';
 
 openLog('move-block');
@@ -22,22 +22,15 @@ export default class UseMoveList {
     // 移动中排序定时器
     this.moveTimer = null;
     /*
-     * 设置需要进行排序的doms
-     * 若是没有传入domlist，将会去wrap内的子元素
-     * */
-    if (options.domList instanceof Array) {
-      this.domList = options.domList;
-    } else {
-      this.domList = Array.prototype.map.call(
-        this.el.querySelectorAll('[name=move-block]'),
-        (item) => item
-      );
-    }
-    delete options.domList;
-    /*
      * 实例化鼠标事件
      * */
     this.initMouse(options);
+    // 获取与重置数据源
+    this.getList = options.getList;
+    this.resetList = options.resetList;
+    // 移动中的样式
+    this.activeClass = options.activeClass || '';
+    this.currentBaseClass = '';
   }
 
   initMouse(options) {
@@ -52,14 +45,14 @@ export default class UseMoveList {
     // 移动动作
     this.scrollBody.move = (e, start, end) => {
       // 监听移动，并变更移动块位置
-      if (press) {
+      if (press && this.currentKey !== null) {
         this.moveTimerHandler();
         this.setMovePosition(start, end);
       }
     };
     // 结束动作
     this.scrollBody.over = (e) => {
-      if (press) {
+      if (press && this.currentKey !== null) {
         // 当鼠标松开时执行的方法
         this.moveOver();
       }
@@ -72,35 +65,40 @@ export default class UseMoveList {
    * 初始化元素的位置信息
    * */
   initDomList(e) {
+    /*
+     * 设置需要进行排序的doms
+     * */
+    this.domList = Array.prototype.map.call(
+      this.el.querySelectorAll('[name=move-block]'),
+      (item) => item
+    );
     /**
      * 注意：这里的positions与domList的顺序可能不一致（根据y、x轴进行排序）
      */
-    if (!this.positions) {
-      this.positions = this.domList.map((dom, key) => {
-        const parent = dom.parentElement;
-        const top = parent.offsetTop;
-        const left = parent.offsetLeft;
-        const width = dom.clientWidth;
-        const height = dom.clientHeight;
-        const unid = dom.getAttribute('unid');
-        return {
-          unid,
-          key,
-          top,
-          left,
-          width,
-          height,
-          scopeX: [left, left + width],
-          scopeY: [top, top + height],
-          translate: {
-            x: 0,
-            y: 0
-          }
-        };
-      });
-      this.resetPositions();
-    }
-    this.findElement(e.path);
+    this.positions = this.domList.map((dom, key) => {
+      const parent = dom.parentElement;
+      const top = parent.offsetTop;
+      const left = parent.offsetLeft;
+      const width = dom.clientWidth;
+      const height = dom.clientHeight;
+      const unid = dom.getAttribute('unid');
+      return {
+        unid,
+        key,
+        top,
+        left,
+        width,
+        height,
+        scopeX: [left, left + width],
+        scopeY: [top, top + height],
+        translate: {
+          x: 0,
+          y: 0
+        }
+      };
+    });
+    this.resetPositions();
+    this.findElement(e.getPath());
     this.setDomPosition();
   }
 
@@ -111,9 +109,11 @@ export default class UseMoveList {
     path.forEach((dom, key) => {
       if (dom.getAttribute && dom.getAttribute('name') === 'move-block') {
         this.currentDom = dom;
+        this.currentBaseClass = dom.getAttribute('class');
         this.currentKey = this.positions.findIndex(
           (v) => v.key === Number(dom.getAttribute('move-index'))
         );
+        this.currentDom.setAttribute('class', this.currentBaseClass + ' ' + this.activeClass);
       }
     });
   }
@@ -131,7 +131,6 @@ export default class UseMoveList {
     this.currentDom.setAttribute(
       'style',
       `
-      border-color:red;
       position:absolute;
       top:0;
       left:0;
@@ -141,24 +140,16 @@ export default class UseMoveList {
     );
   }
 
-  /**
-   * 设置松开事件
-   */
-  moveOver() {
-    if (this.moveTimer) clearTimeout(this.moveTimer);
-    this.setFreeElement();
-  }
-
   /*
    * 设置开始移动doms位置
    * */
   setDomPosition() {
+    if(this.currentKey === null) return;
     const currentXY = this.positions[this.currentKey];
     const translate = currentXY.translate;
     this.currentDom.setAttribute(
       'style',
       `
-      border-color:red;
       position:absolute;
       top:0;
       left:0;
@@ -182,7 +173,6 @@ export default class UseMoveList {
       'style',
       `
       ${style}
-      border-color:red;
       position:absolute;
       top:0;
       left:0;
@@ -191,6 +181,7 @@ export default class UseMoveList {
     `
     );
     setTimeout(() => {
+      this.currentDom.setAttribute('class', this.currentBaseClass);
       this.currentDom.setAttribute('style', style);
     }, 500);
   }
@@ -202,7 +193,7 @@ export default class UseMoveList {
     if (this.moveTimer) clearTimeout(this.moveTimer);
     this.moveTimer = setTimeout(() => {
       this.resetQuene();
-    }, 500);
+    }, 300);
   }
 
   /**
@@ -249,7 +240,7 @@ export default class UseMoveList {
       from: currentKey,
       to: key,
       translate: { ...this.domToPosition(positions[currentKey], positions[key]) },
-      moving: { ...positions[currentKey].translate }
+      moving: { ...(positions[currentKey].moving||positions[currentKey].translate) }
     });
     if (currentKey < key) {
       // 当往前排时，currentKey - key 的元素往前挪
@@ -323,4 +314,44 @@ export default class UseMoveList {
       return ayx > byx ? 1 : -1;
     });
   }
+
+  /**
+   * 设置松开事件
+   */
+  moveOver() {  
+    this.setFreeElement();
+    setTimeout(()=>{
+      this.resortdom();
+      // 对数据进行清空
+      this.resetData();
+    },500);
+  }
+
+  /**
+   * 对dom进行重写排序
+   */
+  resortdom() {
+    let result = [];
+    let list = this.getList();
+    this.positions.forEach((position, key) => {
+      result[key] = list[position.key];
+    });
+    this.domList.forEach((dom) => {
+      dom.setAttribute('style','');
+    });
+    this.resetList(result);
+  }
+
+  /**
+   * 清空数据
+   */
+  resetData() {
+    clearTimeout(this.moveTimer);
+    this.moveTimer = null;
+    this.positions = null;
+    this.currentKey = null;
+    this.currentDom = null;
+    this.domList = [];
+  }
+
 }

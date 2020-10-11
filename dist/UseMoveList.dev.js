@@ -278,24 +278,16 @@
 
       this.moveTimer = null;
       /*
-       * 设置需要进行排序的doms
-       * 若是没有传入domlist，将会去wrap内的子元素
-       * */
-
-      if (options.domList instanceof Array) {
-        this.domList = options.domList;
-      } else {
-        this.domList = Array.prototype.map.call(this.el.querySelectorAll('[name=move-block]'), function (item) {
-          return item;
-        });
-      }
-
-      delete options.domList;
-      /*
        * 实例化鼠标事件
        * */
 
-      this.initMouse(options);
+      this.initMouse(options); // 获取与重置数据源
+
+      this.getList = options.getList;
+      this.resetList = options.resetList; // 移动中的样式
+
+      this.activeClass = options.activeClass || '';
+      this.currentBaseClass = '';
     }
 
     _createClass(UseMoveList, [{
@@ -317,7 +309,7 @@
 
         this.scrollBody.move = function (e, start, end) {
           // 监听移动，并变更移动块位置
-          if (press) {
+          if (press && _this.currentKey !== null) {
             _this.moveTimerHandler();
 
             _this.setMovePosition(start, end);
@@ -326,7 +318,7 @@
 
 
         this.scrollBody.over = function (e) {
-          if (press) {
+          if (press && _this.currentKey !== null) {
             // 当鼠标松开时执行的方法
             _this.moveOver();
           }
@@ -342,36 +334,40 @@
     }, {
       key: "initDomList",
       value: function initDomList(e) {
+        /*
+         * 设置需要进行排序的doms
+         * */
+        this.domList = Array.prototype.map.call(this.el.querySelectorAll('[name=move-block]'), function (item) {
+          return item;
+        });
         /**
          * 注意：这里的positions与domList的顺序可能不一致（根据y、x轴进行排序）
          */
-        if (!this.positions) {
-          this.positions = this.domList.map(function (dom, key) {
-            var parent = dom.parentElement;
-            var top = parent.offsetTop;
-            var left = parent.offsetLeft;
-            var width = dom.clientWidth;
-            var height = dom.clientHeight;
-            var unid = dom.getAttribute('unid');
-            return {
-              unid: unid,
-              key: key,
-              top: top,
-              left: left,
-              width: width,
-              height: height,
-              scopeX: [left, left + width],
-              scopeY: [top, top + height],
-              translate: {
-                x: 0,
-                y: 0
-              }
-            };
-          });
-          this.resetPositions();
-        }
 
-        this.findElement(e.path);
+        this.positions = this.domList.map(function (dom, key) {
+          var parent = dom.parentElement;
+          var top = parent.offsetTop;
+          var left = parent.offsetLeft;
+          var width = dom.clientWidth;
+          var height = dom.clientHeight;
+          var unid = dom.getAttribute('unid');
+          return {
+            unid: unid,
+            key: key,
+            top: top,
+            left: left,
+            width: width,
+            height: height,
+            scopeX: [left, left + width],
+            scopeY: [top, top + height],
+            translate: {
+              x: 0,
+              y: 0
+            }
+          };
+        });
+        this.resetPositions();
+        this.findElement(e.getPath());
         this.setDomPosition();
       }
       /*
@@ -386,9 +382,12 @@
         path.forEach(function (dom, key) {
           if (dom.getAttribute && dom.getAttribute('name') === 'move-block') {
             _this2.currentDom = dom;
+            _this2.currentBaseClass = dom.getAttribute('class');
             _this2.currentKey = _this2.positions.findIndex(function (v) {
               return v.key === Number(dom.getAttribute('move-index'));
             });
+
+            _this2.currentDom.setAttribute('class', _this2.currentBaseClass + ' ' + _this2.activeClass);
           }
         });
       }
@@ -405,17 +404,7 @@
         var translate = currentXY.moving || currentXY.translate;
         currentXY.moveX = moveX;
         currentXY.moveY = moveY;
-        this.currentDom.setAttribute('style', "\n      border-color:red;\n      position:absolute;\n      top:0;\n      left:0;\n      transform:translate(".concat(translate.x + moveX, "px, ").concat(translate.y + moveY, "px);\n      z-index: 100;\n    "));
-      }
-      /**
-       * 设置松开事件
-       */
-
-    }, {
-      key: "moveOver",
-      value: function moveOver() {
-        if (this.moveTimer) clearTimeout(this.moveTimer);
-        this.setFreeElement();
+        this.currentDom.setAttribute('style', "\n      position:absolute;\n      top:0;\n      left:0;\n      transform:translate(".concat(translate.x + moveX, "px, ").concat(translate.y + moveY, "px);\n      z-index: 100;\n    "));
       }
       /*
        * 设置开始移动doms位置
@@ -424,9 +413,10 @@
     }, {
       key: "setDomPosition",
       value: function setDomPosition() {
+        if (this.currentKey === null) return;
         var currentXY = this.positions[this.currentKey];
         var translate = currentXY.translate;
-        this.currentDom.setAttribute('style', "\n      border-color:red;\n      position:absolute;\n      top:0;\n      left:0;\n      transform:translate(".concat(translate.x, "px, ").concat(translate.y, "px);\n      z-index: 100;\n    "));
+        this.currentDom.setAttribute('style', "\n      position:absolute;\n      top:0;\n      left:0;\n      transform:translate(".concat(translate.x, "px, ").concat(translate.y, "px);\n      z-index: 100;\n    "));
       }
       /**
        * 解放元素
@@ -441,8 +431,10 @@
         var translate = currentXY.translate;
         delete currentXY.moving;
         var style = "\n      transform:translate(".concat(translate.x, "px, ").concat(translate.y, "px);\n    ");
-        this.currentDom.setAttribute('style', "\n      ".concat(style, "\n      border-color:red;\n      position:absolute;\n      top:0;\n      left:0;\n      transition: all 0.5s;\n      z-index: 100;\n    "));
+        this.currentDom.setAttribute('style', "\n      ".concat(style, "\n      position:absolute;\n      top:0;\n      left:0;\n      transition: all 0.5s;\n      z-index: 100;\n    "));
         setTimeout(function () {
+          _this3.currentDom.setAttribute('class', _this3.currentBaseClass);
+
           _this3.currentDom.setAttribute('style', style);
         }, 500);
       }
@@ -458,7 +450,7 @@
         if (this.moveTimer) clearTimeout(this.moveTimer);
         this.moveTimer = setTimeout(function () {
           _this4.resetQuene();
-        }, 500);
+        }, 300);
       }
       /**
        * 当鼠标停下超过500毫秒，将会判断是否触发排序
@@ -519,7 +511,7 @@
           from: currentKey,
           to: key,
           translate: _objectSpread2({}, this.domToPosition(positions[currentKey], positions[key])),
-          moving: _objectSpread2({}, positions[currentKey].translate)
+          moving: _objectSpread2({}, positions[currentKey].moving || positions[currentKey].translate)
         });
 
         if (currentKey < key) {
@@ -595,10 +587,84 @@
           return ayx > byx ? 1 : -1;
         });
       }
+      /**
+       * 设置松开事件
+       */
+
+    }, {
+      key: "moveOver",
+      value: function moveOver() {
+        var _this7 = this;
+
+        this.setFreeElement();
+        setTimeout(function () {
+          _this7.resortdom(); // 对数据进行清空
+
+
+          _this7.resetData();
+        }, 500);
+      }
+      /**
+       * 对dom进行重写排序
+       */
+
+    }, {
+      key: "resortdom",
+      value: function resortdom() {
+        var result = [];
+        var list = this.getList();
+        this.positions.forEach(function (position, key) {
+          result[key] = list[position.key];
+        });
+        this.domList.forEach(function (dom) {
+          dom.setAttribute('style', '');
+        });
+        this.resetList(result);
+      }
+      /**
+       * 清空数据
+       */
+
+    }, {
+      key: "resetData",
+      value: function resetData() {
+        clearTimeout(this.moveTimer);
+        this.moveTimer = null;
+        this.positions = null;
+        this.currentKey = null;
+        this.currentDom = null;
+        this.domList = [];
+      }
     }]);
 
     return UseMoveList;
   }();
+
+  /*
+   * 为mixpad的鼠标事件添加获取path的方法
+   * */
+
+  MouseEvent.prototype.getPath = function () {
+    if (this.path) {
+      return this.path;
+    } else {
+      var target = this.target;
+      var path = [target];
+
+      if (target instanceof Node) {
+        var parent = target.parentElement;
+
+        while (parent) {
+          path.push(parent);
+          parent = parent.parentElement;
+        }
+
+        return path;
+      } else {
+        return path;
+      }
+    }
+  };
 
   return UseMoveList;
 

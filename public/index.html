@@ -32,6 +32,9 @@
         -webkit-user-select: none;
         overflow: hidden;
       }
+      .active-move-block {
+        border:1px solid red !important;
+      }
     </style>
     <div id="app">
       <div class="wrap">
@@ -59,12 +62,21 @@
               return result;
             })()
           };
+        },
+        mounted: function() {
+          new UseMoveList({
+            el: document.querySelector('.wrap'),
+            activeClass: 'active-move-block',
+            getList: () =>{
+              return this.list;
+            },
+            resetList: (list) => {
+              this.list = list;
+            }
+          });
         }
       });
-      new UseMoveList({
-        el: document.querySelector('.wrap'),
-        pressDelay: 500
-      });
+      
     </script>
   </body>
 </html>

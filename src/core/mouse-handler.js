@@ -1,4 +1,4 @@
-import { printLog, openLog } from './utils/utils';
+import { printLog, openLog } from './log';
 
 openLog('mouse-handler');
 
