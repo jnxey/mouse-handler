@@ -3,7 +3,7 @@ import MouseHandler from './mouse-handler';
 
 openLog('move-block');
 
-export default class UseMoveList {
+export default class UseDragSort {
   /*
    * options只需要传入 id, wrapHeight: 480, domWidth: 480, domHeight: Y, direction: 'y',
    * id元素布局必需是非static，内部项的style尽量为null
@@ -144,7 +144,7 @@ export default class UseMoveList {
    * 设置开始移动doms位置
    * */
   setDomPosition() {
-    if(this.currentKey === null) return;
+    if (this.currentKey === null) return;
     const currentXY = this.positions[this.currentKey];
     const translate = currentXY.translate;
     this.currentDom.setAttribute(
@@ -216,7 +216,7 @@ export default class UseMoveList {
           /** 对positions重新排序 **/
           const moveInfo = this.cacheChangePositions(currentKey, key, this.positions);
           moveInfo.forEach((move) => {
-            console.log(move);
+            printLog(move, 'move-block');
             if (move.moving) this.positions[move.from].moving = move.moving;
             this.positions[move.from].translate = move.translate;
           });
@@ -225,7 +225,6 @@ export default class UseMoveList {
           // 重新对positions进行排序
           this.currentKey = key;
           this.resetPositions();
-          console.log(this.positions);
         }
       }
     });
@@ -240,7 +239,7 @@ export default class UseMoveList {
       from: currentKey,
       to: key,
       translate: { ...this.domToPosition(positions[currentKey], positions[key]) },
-      moving: { ...(positions[currentKey].moving||positions[currentKey].translate) }
+      moving: { ...(positions[currentKey].moving || positions[currentKey].translate) }
     });
     if (currentKey < key) {
       // 当往前排时，currentKey - key 的元素往前挪
@@ -318,13 +317,13 @@ export default class UseMoveList {
   /**
    * 设置松开事件
    */
-  moveOver() {  
+  moveOver() {
     this.setFreeElement();
-    setTimeout(()=>{
+    setTimeout(() => {
       this.resortdom();
       // 对数据进行清空
       this.resetData();
-    },500);
+    }, 500);
   }
 
   /**
@@ -337,7 +336,7 @@ export default class UseMoveList {
       result[key] = list[position.key];
     });
     this.domList.forEach((dom) => {
-      dom.setAttribute('style','');
+      dom.setAttribute('style', '');
     });
     this.resetList(result);
   }
@@ -353,5 +352,4 @@ export default class UseMoveList {
     this.currentDom = null;
     this.domList = [];
   }
-
 }

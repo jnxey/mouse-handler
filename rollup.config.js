@@ -12,9 +12,10 @@ export default {
   // 出口
   output: {
     // 出口目录
-    file: process.env.NODE_ENV === 'development' ? 'dist/UseMoveList.dev.js' : 'dist/UseMoveList.js',
+    file:
+      process.env.NODE_ENV === 'development' ? 'dist/UseDragSort.dev.js' : 'dist/UseDragSort.js',
     // 全局变量名字
-    name: 'UseMoveList',
+    name: 'useMouse',
     // 模块规范
     format: 'umd',
     // es6 -> es5-

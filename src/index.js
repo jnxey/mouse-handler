@@ -1,4 +1,5 @@
-import UseMoveList from './core/move-block';
+import UseDragSort from './core/mouse-dragsort';
+import UseScroll from './core/mouse-scroll';
 
 /*
  * 为mixpad的鼠标事件添加获取path的方法
@@ -22,5 +23,7 @@ MouseEvent.prototype.getPath = function () {
   }
 };
 
-
-export default UseMoveList;
+export default {
+  UseScroll,
+  UseDragSort
+};
