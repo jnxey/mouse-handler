@@ -84,12 +84,50 @@
       console.log(message);
     }
   };
+  /*
+   * 为mixpad的鼠标事件添加获取path的方法
+   * */
+
+  var getPath = function getPath(mouseEvent) {
+    if (mouseEvent.path) {
+      return mouseEvent.path;
+    } else {
+      var target = mouseEvent.target;
+      var path = [target];
+
+      if (target instanceof Node) {
+        var parent = target.parentElement;
+
+        while (parent) {
+          path.push(parent);
+          parent = parent.parentElement;
+        }
+
+        return path;
+      } else {
+        return path;
+      }
+    }
+  };
 
   openLog('mouse-handler'); // 事件
   var ASSERT_MOVE = 20; // 断言长按与移动,px
 
   var ASSERT_PRESS = 300; // 断言点击长按,ms
-  // 监听一个元素内的鼠标事件
+
+  var isPc = IsPC();
+  var eventTyps = {
+    start: 'touchstart',
+    move: 'touchmove',
+    end: 'touchend'
+  };
+
+  if (isPc) {
+    eventTyps.start = 'mousedown';
+    eventTyps.move = 'mousemove';
+    eventTyps.end = 'mouseup';
+  } // 监听一个元素内的鼠标事件
+
 
   var MouseHandler = /*#__PURE__*/function () {
     function MouseHandler(options) {
@@ -113,10 +151,10 @@
        * 现在先分析 长按->拖拽 场景
        * */
 
-      this.el.addEventListener('mousedown', this.mousedown.bind(this));
-      this.el.addEventListener('mousemove', this.mousemove.bind(this)); // this.el.addEventListener('mouseup', this.mouseup.bind(this));
+      this.el.addEventListener(eventTyps.start, this.mousedown.bind(this));
+      this.el.addEventListener(eventTyps.move, this.mousemove.bind(this)); // this.el.addEventListener('mouseup', this.mouseup.bind(this));
 
-      document.addEventListener('mouseup', this.mouseup.bind(this));
+      document.addEventListener(eventTyps.end, this.mouseup.bind(this));
     } // 初始化值
 
 
@@ -254,6 +292,21 @@
 
     return MouseHandler;
   }();
+
+  function IsPC() {
+    var userAgentInfo = navigator.userAgent;
+    var Agents = ["Android", "iPhone", "SymbianOS", "Windows Phone", "iPad", "iPod"];
+    var flag = true;
+
+    for (var v = 0; v < Agents.length; v++) {
+      if (userAgentInfo.indexOf(Agents[v]) > 0) {
+        flag = false;
+        break;
+      }
+    }
+
+    return flag;
+  }
 
   openLog('move-block');
 
@@ -393,7 +446,7 @@
           };
         });
         this.resetPositions();
-        this.findElement(e.getPath());
+        this.findElement(getPath(e));
         this.setDomPosition();
       }
       /*
@@ -725,8 +778,8 @@
        */
 
     }, {
-      key: "destory",
-      value: function destory() {
+      key: "destroy",
+      value: function destroy() {
         clearTimeout(this.moveTimer);
         this.moveTimer = null;
         this.positions = null;
@@ -808,6 +861,10 @@
     return result;
   }
 
+  var rAF = window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || window.oRequestAnimationFrame || window.msRequestAnimationFrame || function (callback) {
+    window.setTimeout(callback, 1000 / 60);
+  };
+
   openLog('move-block');
 
   var UseScrollY = /*#__PURE__*/function () {
@@ -820,7 +877,7 @@
        * 这里仅获取当前调用组件内的元素
        * 若是其他地方有重复组件（如首屏滑块），需要将排序数据存入store
        * */
-      if (options.wrap instanceof Node) this.wrap = options.wrap;else throw Error('el must be a Element');
+      if (options.wrap instanceof Node) this.wrap = options.wrap;else throw Error('wrap must be a Element');
       if (options.el instanceof Node) this.el = options.el;else throw Error('el must be a Element');
       this.scrollY = 0;
       this.lastScrollY = 0;
@@ -834,6 +891,9 @@
       }
 
       this.timer = null;
+      this.wrapHeight = this.wrap.clientHeight;
+      this.elHeight = this.el.clientHeight;
+      this.maxScrollHeight = this.elHeight - this.wrapHeight;
     }
 
     _createClass(UseScrollY, [{
@@ -845,6 +905,9 @@
         var isScroll = null;
         var isdown = false;
         var startY = 0;
+        var endY = 0;
+        var startTime = 0;
+        var endTime = 0;
 
         this.scrollBody.down = function (e) {
           isdown = true;
@@ -862,12 +925,14 @@
             var ratio = Math.abs(y) / (Math.abs(x) + 1);
 
             if (ratio >= 3 && Math.abs(y) >= 30) {
+              startTime = new Date().getTime();
               isScroll = true;
               startY = y;
             }
           }
 
           if (isScroll) {
+            endY = y;
             _this.scrollBody.stop = true;
 
             _this.setScrollY(y - startY);
@@ -876,7 +941,20 @@
 
         this.scrollBody.over = function (e) {
           _this.scrollBody.stop = false;
-          _this.lastScrollY = _this.scrollY;
+          _this.lastScrollY = _this.scrollY; // 检查滑动速度，设置缓冲距离
+
+          endTime = new Date().getTime();
+          var moveTime = endTime - startTime;
+          var moveDistance = endY - startY;
+          var speedRate = moveDistance / moveTime;
+
+          if (Math.abs(speedRate) > 0.5) {
+            // 进行缓冲
+            speedRate = speedRate > 0 ? -1 : 1;
+
+            _this.setDomScrollBuffer(speedRate * 100);
+          }
+
           isScroll = null;
           isdown = false;
           startY = 0;
@@ -888,7 +966,7 @@
 
     }, {
       key: "setScrollY",
-      value: function setScrollY(y, callback) {
+      value: function setScrollY(y) {
         // y表示当前鼠标按下动作过程滚动距离
         var result = true;
         var next = this.lastScrollY - y;
@@ -922,15 +1000,6 @@
         }, 16);
       }
       /**
-       * stop scroll to bottom
-       */
-
-    }, {
-      key: "stopScrolly",
-      value: function stopScrolly() {
-        if (this.timer) clearInterval(this.timer);
-      }
-      /**
        * scroll to bottom
        */
 
@@ -946,6 +1015,15 @@
           if (callback && result) callback(-1);
         }, 16);
       }
+      /**
+       * stop scroll to bottom
+       */
+
+    }, {
+      key: "stopScrolly",
+      value: function stopScrolly() {
+        if (this.timer) clearInterval(this.timer);
+      }
       /*
        * 设置元素的位置信息
        * */
@@ -953,15 +1031,46 @@
     }, {
       key: "setDomScroll",
       value: function setDomScroll(scrolly) {
-        this.el.setAttribute('style', "transform:translate(0, -".concat(scrolly, "px)"));
+        var _this4 = this;
+
+        rAF(function () {
+          _this4.el.setAttribute('style', "transform:translate(0, -".concat(scrolly, "px)"));
+        });
+      }
+      /*
+       * 设置缓冲
+       * */
+
+    }, {
+      key: "setDomScrollBuffer",
+      value: function setDomScrollBuffer(sy) {
+        var _this5 = this;
+
+        var next = this.lastScrollY + sy;
+
+        if (next < 0) {
+          next = 0;
+        } else if (next >= this.maxScrollHeight) {
+          next = this.maxScrollHeight;
+        }
+
+        var distance = Math.abs(next - this.lastScrollY);
+        var slideTime = distance / 800;
+        this.lastScrollY = next; // rAF(() => {
+        // })
+
+        this.el.setAttribute('style', "transform:translate(0, -".concat(next, "px);transition: all ").concat(slideTime, "s;"));
+        setTimeout(function () {
+          _this5.el.setAttribute('style', "transform:translate(0, -".concat(next, "px);"));
+        }, 500);
       }
       /**
        * 销毁实例缓存
        */
 
     }, {
-      key: "destory",
-      value: function destory() {
+      key: "destroy",
+      value: function destroy() {
         this.wrap = null;
         this.el = null;
       }

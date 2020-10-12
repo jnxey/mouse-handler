@@ -1,4 +1,4 @@
-import { printLog, openLog, deepCopy } from './log';
+import { printLog, openLog, getPath } from './utils';
 import MouseHandler from './mouse-handler';
 
 openLog('move-block');
@@ -120,7 +120,7 @@ export default class UseDragSort {
       };
     });
     this.resetPositions();
-    this.findElement(e.getPath());
+    this.findElement(getPath(e));
     this.setDomPosition();
   }
 
@@ -427,7 +427,7 @@ export default class UseDragSort {
   /**
    * 销毁实例缓存
    */
-  destory() {
+  destroy() {
     clearTimeout(this.moveTimer);
     this.moveTimer = null;
     this.positions = null;
@@ -440,7 +440,6 @@ export default class UseDragSort {
     // 全部清除
     this.el = null;
     this.scroll = null;
-    
   }
 }
 

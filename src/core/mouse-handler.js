@@ -1,4 +1,4 @@
-import { printLog, openLog } from './log';
+import { printLog, openLog } from './utils';
 
 openLog('mouse-handler');
 
@@ -12,6 +12,20 @@ const EVENT_TYPE = {
 
 const ASSERT_MOVE = 20; // 断言长按与移动,px
 const ASSERT_PRESS = 300; // 断言点击长按,ms
+
+const isPc = IsPC();
+
+const eventTyps = {
+  start: 'touchstart',
+  move: 'touchmove',
+  end: 'touchend'
+};
+
+if(isPc) {
+  eventTyps.start = 'mousedown';
+  eventTyps.move = 'mousemove';
+  eventTyps.end = 'mouseup';
+}
 
 // 监听一个元素内的鼠标事件
 export default class MouseHandler {
@@ -33,10 +47,10 @@ export default class MouseHandler {
      * --------------------
      * 现在先分析 长按->拖拽 场景
      * */
-    this.el.addEventListener('mousedown', this.mousedown.bind(this));
-    this.el.addEventListener('mousemove', this.mousemove.bind(this));
+    this.el.addEventListener(eventTyps.start, this.mousedown.bind(this));
+    this.el.addEventListener(eventTyps.move, this.mousemove.bind(this));
     // this.el.addEventListener('mouseup', this.mouseup.bind(this));
-    document.addEventListener('mouseup', this.mouseup.bind(this));
+    document.addEventListener(eventTyps.end, this.mouseup.bind(this));
   }
 
   // 初始化值
@@ -122,4 +136,19 @@ export default class MouseHandler {
     if (typeof this.over === 'function') this.over(e);
     this.initData();
   }
+}
+
+function IsPC() {
+  var userAgentInfo = navigator.userAgent;
+  var Agents = ["Android", "iPhone",
+              "SymbianOS", "Windows Phone",
+              "iPad", "iPod"];
+  var flag = true;
+  for (var v = 0; v < Agents.length; v++) {
+      if (userAgentInfo.indexOf(Agents[v]) > 0) {
+          flag = false;
+          break;
+      }
+  }
+  return flag;
 }
