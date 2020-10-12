@@ -16,7 +16,7 @@ const ASSERT_PRESS = 300; // 断言点击长按,ms
 // 监听一个元素内的鼠标事件
 export default class MouseHandler {
   constructor(options) {
-    if (options.el instanceof Node) this.el = options.el;
+    if (options.el instanceof Node) this.el = options.wrap || options.el;
     else throw Error('el must be a Element');
     this.$options = options; // 内含一系列钩子
     this.initData();
@@ -33,8 +33,8 @@ export default class MouseHandler {
      * --------------------
      * 现在先分析 长按->拖拽 场景
      * */
-    document.addEventListener('mousedown', this.mousedown.bind(this));
-    document.addEventListener('mousemove', this.mousemove.bind(this));
+    this.el.addEventListener('mousedown', this.mousedown.bind(this));
+    this.el.addEventListener('mousemove', this.mousemove.bind(this));
     // this.el.addEventListener('mouseup', this.mouseup.bind(this));
     document.addEventListener('mouseup', this.mouseup.bind(this));
   }
@@ -57,6 +57,7 @@ export default class MouseHandler {
     this.setAction('down'); // 鼠标按下
     this.downtime = new Date().getTime();
     this.startCoor = { x: e.x, y: e.y };
+    if (typeof this.down === 'function') this.down(e);
     setTimeout(() => {
       // 当超过断言值时
       printLog('action------------------------' + this.action, 'mouse-handler');

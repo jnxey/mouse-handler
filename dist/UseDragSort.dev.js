@@ -95,7 +95,7 @@
     function MouseHandler(options) {
       _classCallCheck(this, MouseHandler);
 
-      if (options.el instanceof Node) this.el = options.el;else throw Error('el must be a Element');
+      if (options.el instanceof Node) this.el = options.wrap || options.el;else throw Error('el must be a Element');
       this.$options = options; // 内含一系列钩子
 
       this.initData();
@@ -113,8 +113,8 @@
        * 现在先分析 长按->拖拽 场景
        * */
 
-      document.addEventListener('mousedown', this.mousedown.bind(this));
-      document.addEventListener('mousemove', this.mousemove.bind(this)); // this.el.addEventListener('mouseup', this.mouseup.bind(this));
+      this.el.addEventListener('mousedown', this.mousedown.bind(this));
+      this.el.addEventListener('mousemove', this.mousemove.bind(this)); // this.el.addEventListener('mouseup', this.mouseup.bind(this));
 
       document.addEventListener('mouseup', this.mouseup.bind(this));
     } // 初始化值
@@ -162,6 +162,7 @@
           x: e.x,
           y: e.y
         };
+        if (typeof this.down === 'function') this.down(e);
         setTimeout(function () {
           // 当超过断言值时
           printLog('action------------------------' + _this.action, 'mouse-handler');
@@ -258,7 +259,6 @@
 
   var UseDragSort = /*#__PURE__*/function () {
     /*
-     * options只需要传入 id, wrapHeight: 480, domWidth: 480, domHeight: Y, direction: 'y',
      * id元素布局必需是非static，内部项的style尽量为null
      * 所有移动块上需设置name="move-block" :move-index="key"
      * 当进行布局时，将会是一个非常耗费性能的操作
@@ -288,9 +288,31 @@
 
       this.activeClass = options.activeClass || '';
       this.currentBaseClass = '';
-    }
+      this.scroll = options.scroll;
+      this.fixScrollY = 0;
+      this.cacheMove = null;
+    } // 查找滚动元素
+
 
     _createClass(UseDragSort, [{
+      key: "getScrollEle",
+      value: function getScrollEle() {
+        // 找到父级是否有需要滚动的元素
+        var result = null;
+        var parents = findParents(this.el);
+        parents.forEach(function (ele) {
+          if (ele.getAttribute('scroll') === 'y') {
+            result = {
+              dom: ele,
+              x: ele.clientWidth,
+              y: ele.clientHeight
+            };
+          }
+        });
+        return result;
+      } // 初始化鼠标事件
+
+    }, {
       key: "initMouse",
       value: function initMouse(options) {
         var _this = this;
@@ -309,6 +331,8 @@
 
         this.scrollBody.move = function (e, start, end) {
           // 监听移动，并变更移动块位置
+          if (_this.scroll) _this.scroll.stopScrolly();
+
           if (press && _this.currentKey !== null) {
             _this.moveTimerHandler();
 
@@ -334,9 +358,11 @@
     }, {
       key: "initDomList",
       value: function initDomList(e) {
+        this.scrollEle = this.getScrollEle();
         /*
          * 设置需要进行排序的doms
          * */
+
         this.domList = Array.prototype.map.call(this.el.querySelectorAll('[name=move-block]'), function (item) {
           return item;
         });
@@ -398,13 +424,39 @@
     }, {
       key: "setMovePosition",
       value: function setMovePosition(start, end) {
+        this.cacheMove = {
+          start: start,
+          end: end
+        };
         var moveX = end.x - start.x;
-        var moveY = end.y - start.y;
+        var moveY = end.y - start.y + this.fixScrollY;
         var currentXY = this.positions[this.currentKey];
         var translate = currentXY.moving || currentXY.translate;
         currentXY.moveX = moveX;
         currentXY.moveY = moveY;
         this.currentDom.setAttribute('style', "\n      position:absolute;\n      top:0;\n      left:0;\n      transform:translate(".concat(translate.x + moveX, "px, ").concat(translate.y + moveY, "px);\n      z-index: 100;\n    "));
+      }
+      /*
+       * 向上滚动 -1
+       * */
+
+    }, {
+      key: "scrollTop",
+      value: function scrollTop() {
+        if (!this.cacheMove) return;
+        this.fixScrollY -= 1;
+        this.setMovePosition(this.cacheMove.start, this.cacheMove.end);
+      }
+      /*
+       * 向下滚动 +1
+       * */
+
+    }, {
+      key: "scrollBottom",
+      value: function scrollBottom() {
+        if (!this.cacheMove) return;
+        this.fixScrollY += 1;
+        this.setMovePosition(this.cacheMove.start, this.cacheMove.end);
       }
       /*
        * 设置开始移动doms位置
@@ -449,11 +501,41 @@
 
         if (this.moveTimer) clearTimeout(this.moveTimer);
         this.moveTimer = setTimeout(function () {
-          _this4.resetQuene();
+          var status = _this4.resetQuene();
+
+          if (status === 'none') {
+            // 判断是否处于需要上下滚动的内容中
+            if (_this4.scrollEle && _this4.scroll) {
+              var scrollDOM = _this4.scrollEle.dom;
+              var currentDOM = _this4.currentDom;
+              var scrollRECT = _this4.scrollEle;
+              var currentXY = _this4.positions[_this4.currentKey];
+              var translate = {
+                x: currentXY.moveX,
+                y: currentXY.moveY
+              };
+              var offset = getOffsetDOM(_this4.currentDom, scrollDOM, translate);
+              console.log('scrollRECT' + JSON.stringify(scrollRECT));
+              console.log('offset' + JSON.stringify(offset));
+              console.log('currentDOM' + JSON.stringify(currentDOM.clientHeight));
+
+              var _status = judgeScroll(scrollRECT, offset, currentDOM.clientHeight, _this4.fixScrollY, _this4.scroll.scrollY);
+
+              if (_status === 'top') {
+                _this4.scroll.startToTop(function () {
+                  _this4.scrollTop();
+                });
+              } else if (_status === 'bottom') {
+                _this4.scroll.startToBottom(function () {
+                  _this4.scrollBottom();
+                });
+              }
+            }
+          }
         }, 300);
       }
       /**
-       * 当鼠标停下超过500毫秒，将会判断是否触发排序
+       * 当鼠标停下超过300毫秒，将会判断是否触发排序
        */
 
     }, {
@@ -461,6 +543,7 @@
       value: function resetQuene() {
         var _this5 = this;
 
+        var result = 'none';
         var currentXY = this.positions[this.currentKey];
         var currentTranslate = currentXY.moving || currentXY.translate;
         var currentX = currentXY.left + currentXY.moveX + currentTranslate.x;
@@ -475,7 +558,8 @@
             var _y = Math.abs(position.top + translate.y - currentY);
 
             if (_x <= 30 && _y <= 30) {
-              printLog('重新排序：' + _this5.currentKey + '---to---' + key, 'move-block'); // 当往前排时，替换的元素往前挪
+              printLog('重新排序：' + _this5.currentKey + '---to---' + key, 'move-block');
+              result = 'resort'; // 当往前排时，替换的元素往前挪
 
               /** 对positions重新排序 **/
 
@@ -496,6 +580,7 @@
             }
           }
         });
+        return result;
       }
       /**
        * 缓存位置变更信息
@@ -632,65 +717,235 @@
         this.currentKey = null;
         this.currentDom = null;
         this.domList = [];
+        this.scrollEle = null;
+        this.cacheMove = null;
+        this.fixScrollY = 0;
+      }
+      /**
+       * 销毁实例缓存
+       */
+
+    }, {
+      key: "destory",
+      value: function destory() {
+        clearTimeout(this.moveTimer);
+        this.moveTimer = null;
+        this.positions = null;
+        this.currentKey = null;
+        this.currentDom = null;
+        this.domList = [];
+        this.scrollEle = null;
+        this.cacheMove = null;
+        this.fixScrollY = 0; // 全部清除
+
+        this.el = null;
+        this.scroll = null;
       }
     }]);
 
     return UseDragSort;
   }();
 
+  function findParents(Node) {
+    var result = [Node];
+    var target = Node;
+    var parent = target.parentElement;
+
+    while (parent) {
+      result.push(parent);
+      parent = parent.parentElement;
+    }
+
+    return result;
+  } // 判定是在底部或是在顶部
+
+
+  function judgeScroll(p1, p2, fixBottom, fix, scrollY) {
+    var value = p1.y - (p2.y - fix - scrollY);
+    var topValue = p1.y - 60;
+    var bottomValue = 60 + fixBottom;
+
+    if (value >= topValue) {
+      return 'top';
+    } else if (value <= bottomValue) {
+      return 'bottom';
+    } else {
+      return 'middle';
+    }
+  } // 找到当前元素与滚动元素之间所有doms
+
+
+  function findInDOM(start, end) {
+    var result = [];
+    var parent = start;
+
+    while (parent && parent !== end) {
+      parent = parent.parentElement;
+      result.push(parent);
+    }
+
+    return result;
+  } // 获取dom之间的相对位置
+
+
+  function getOffsetDOM(start, end, translate) {
+    var parents = findInDOM(start, end);
+    var result = {
+      x: translate.x,
+      y: translate.y
+    };
+
+    function getOffset(node) {
+      result = {
+        x: node.offsetLeft + result.x,
+        y: node.offsetTop + result.y
+      };
+    }
+
+    getOffset(start);
+    parents.forEach(function (dom) {
+      getOffset(dom);
+    });
+    return result;
+  }
+
   openLog('move-block');
 
-  var UseScroll = /*#__PURE__*/function () {
+  var UseScrollY = /*#__PURE__*/function () {
     /*
-     * options只需要传入 id, wrapHeight: 480, domWidth: 480, domHeight: Y, direction: 'y',
-     * id元素布局必需是非static，内部项的style尽量为null
-     * 所有移动块上需设置name="move-block" :move-index="key"
-     * 当进行布局时，将会是一个非常耗费性能的操作
      * */
-    function UseScroll(options) {
-      _classCallCheck(this, UseScroll);
+    function UseScrollY(options) {
+      _classCallCheck(this, UseScrollY);
 
       /*
        * 这里仅获取当前调用组件内的元素
        * 若是其他地方有重复组件（如首屏滑块），需要将排序数据存入store
        * */
+      if (options.wrap instanceof Node) this.wrap = options.wrap;else throw Error('el must be a Element');
       if (options.el instanceof Node) this.el = options.el;else throw Error('el must be a Element');
+      this.scrollY = 0;
+      this.lastScrollY = 0;
+      this.maxScrollHeight = this.el.clientHeight - this.wrap.clientHeight;
       /*
        * 实例化鼠标事件
        * */
 
-      this.initMouse(options);
+      if (this.maxScrollHeight > 0) {
+        this.initMouse(options);
+      }
+
+      this.timer = null;
     }
 
-    _createClass(UseScroll, [{
+    _createClass(UseScrollY, [{
       key: "initMouse",
       value: function initMouse(options) {
         var _this = this;
 
         this.scrollBody = new MouseHandler(options);
         var isScroll = null;
-        var startY = 0; // 移动动作
+        var isdown = false;
+        var startY = 0;
+
+        this.scrollBody.down = function (e) {
+          isdown = true;
+        }; // 移动动作
+
 
         this.scrollBody.move = function (e, start, end) {
-          // 监听移动，并变更移动块位置
+          if (!isdown) return; // 监听移动，并变更移动块位置
           // 当纵向 / 横向 移动比例超过3，且纵向长度超过30px，即认定开始滚动
+
           var x = end.x - start.x;
           var y = end.y - start.y;
-          console.log(y);
 
           if (isScroll === null) {
-            var ratio = Math.abs(y) / Math.abs(x);
+            var ratio = Math.abs(y) / (Math.abs(x) + 1);
 
-            if (ratio > 3 && y > 30) {
+            if (ratio >= 3 && Math.abs(y) >= 30) {
               isScroll = true;
               startY = y;
             }
           }
 
           if (isScroll) {
-            _this.setDomScroll(y - startY);
+            _this.scrollBody.stop = true;
+
+            _this.setScrollY(y - startY);
           }
         };
+
+        this.scrollBody.over = function (e) {
+          _this.scrollBody.stop = false;
+          _this.lastScrollY = _this.scrollY;
+          isScroll = null;
+          isdown = false;
+          startY = 0;
+        };
+      }
+      /**
+       * 设置scrolly
+       */
+
+    }, {
+      key: "setScrollY",
+      value: function setScrollY(y, callback) {
+        // y表示当前鼠标按下动作过程滚动距离
+        var result = true;
+        var next = this.lastScrollY - y;
+
+        if (next < 0) {
+          next = 0;
+          result = false;
+        } else if (next >= this.maxScrollHeight) {
+          next = this.maxScrollHeight;
+          result = false;
+        }
+
+        this.scrollY = next;
+        this.setDomScroll(next);
+        return result;
+      }
+      /**
+       * scroll to top
+       */
+
+    }, {
+      key: "startToTop",
+      value: function startToTop(callback) {
+        var _this2 = this;
+
+        this.timer = setInterval(function () {
+          var result = _this2.setScrollY(1);
+
+          _this2.lastScrollY = _this2.scrollY;
+          if (callback && result) callback(1);
+        }, 16);
+      }
+      /**
+       * stop scroll to bottom
+       */
+
+    }, {
+      key: "stopScrolly",
+      value: function stopScrolly() {
+        if (this.timer) clearInterval(this.timer);
+      }
+      /**
+       * scroll to bottom
+       */
+
+    }, {
+      key: "startToBottom",
+      value: function startToBottom(callback) {
+        var _this3 = this;
+
+        this.timer = setInterval(function () {
+          var result = _this3.setScrollY(-1);
+
+          _this3.lastScrollY = _this3.scrollY;
+          if (callback && result) callback(-1);
+        }, 16);
       }
       /*
        * 设置元素的位置信息
@@ -698,12 +953,22 @@
 
     }, {
       key: "setDomScroll",
-      value: function setDomScroll(y) {
-        this.el.setAttribute('style', "transform:translate(0, ".concat(y, "px)"));
+      value: function setDomScroll(scrolly) {
+        this.el.setAttribute('style', "transform:translate(0, -".concat(scrolly, "px)"));
+      }
+      /**
+       * 销毁实例缓存
+       */
+
+    }, {
+      key: "destory",
+      value: function destory() {
+        this.wrap = null;
+        this.el = null;
       }
     }]);
 
-    return UseScroll;
+    return UseScrollY;
   }();
 
   /*
@@ -733,7 +998,7 @@
   };
 
   var index = {
-    UseScroll: UseScroll,
+    UseScrollY: UseScrollY,
     UseDragSort: UseDragSort
   };
 

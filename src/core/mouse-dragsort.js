@@ -5,7 +5,6 @@ openLog('move-block');
 
 export default class UseDragSort {
   /*
-   * options只需要传入 id, wrapHeight: 480, domWidth: 480, domHeight: Y, direction: 'y',
    * id元素布局必需是非static，内部项的style尽量为null
    * 所有移动块上需设置name="move-block" :move-index="key"
    * 当进行布局时，将会是一个非常耗费性能的操作
@@ -31,8 +30,29 @@ export default class UseDragSort {
     // 移动中的样式
     this.activeClass = options.activeClass || '';
     this.currentBaseClass = '';
+    this.scroll = options.scroll;
+    this.fixScrollY = 0;
+    this.cacheMove = null;
   }
 
+  // 查找滚动元素
+  getScrollEle() {
+    // 找到父级是否有需要滚动的元素
+    let result = null;
+    const parents = findParents(this.el);
+    parents.forEach((ele) => {
+      if(ele.getAttribute('scroll') === 'y') {
+        result = {
+          dom: ele,
+          x: ele.clientWidth,
+          y: ele.clientHeight
+        };
+      }
+    });
+    return result;
+  }
+
+  // 初始化鼠标事件
   initMouse(options) {
     let press = false;
     this.scrollBody = new MouseHandler(options);
@@ -45,6 +65,7 @@ export default class UseDragSort {
     // 移动动作
     this.scrollBody.move = (e, start, end) => {
       // 监听移动，并变更移动块位置
+      if(this.scroll) this.scroll.stopScrolly();
       if (press && this.currentKey !== null) {
         this.moveTimerHandler();
         this.setMovePosition(start, end);
@@ -65,6 +86,7 @@ export default class UseDragSort {
    * 初始化元素的位置信息
    * */
   initDomList(e) {
+    this.scrollEle = this.getScrollEle();
     /*
      * 设置需要进行排序的doms
      * */
@@ -122,8 +144,9 @@ export default class UseDragSort {
    * 设置滑动位置
    * */
   setMovePosition(start, end) {
+    this.cacheMove = { start, end };
     const moveX = end.x - start.x;
-    const moveY = end.y - start.y;
+    const moveY = end.y - start.y + this.fixScrollY;
     const currentXY = this.positions[this.currentKey];
     const translate = currentXY.moving || currentXY.translate;
     currentXY.moveX = moveX;
@@ -138,6 +161,24 @@ export default class UseDragSort {
       z-index: 100;
     `
     );
+  }
+
+  /*
+   * 向上滚动 -1
+   * */
+  scrollTop() {
+    if(!this.cacheMove) return;
+    this.fixScrollY -= 1;
+    this.setMovePosition(this.cacheMove.start, this.cacheMove.end);
+  }
+
+  /*
+   * 向下滚动 +1
+   * */
+  scrollBottom() {
+    if(!this.cacheMove) return;
+    this.fixScrollY += 1;
+    this.setMovePosition(this.cacheMove.start, this.cacheMove.end);
   }
 
   /*
@@ -192,14 +233,39 @@ export default class UseDragSort {
   moveTimerHandler(position) {
     if (this.moveTimer) clearTimeout(this.moveTimer);
     this.moveTimer = setTimeout(() => {
-      this.resetQuene();
+      const status = this.resetQuene();
+      if(status === 'none') {
+        // 判断是否处于需要上下滚动的内容中
+        if(this.scrollEle && this.scroll) {
+          const scrollDOM = this.scrollEle.dom;
+          const currentDOM = this.currentDom;
+          const scrollRECT = this.scrollEle;
+          const currentXY = this.positions[this.currentKey];
+          const translate = { x: currentXY.moveX, y: currentXY.moveY};
+          const offset = getOffsetDOM(this.currentDom, scrollDOM, translate);
+          console.log('scrollRECT' + JSON.stringify(scrollRECT));
+          console.log('offset' + JSON.stringify(offset));
+          console.log('currentDOM' + JSON.stringify(currentDOM.clientHeight));
+          const status = judgeScroll(scrollRECT, offset, currentDOM.clientHeight, this.fixScrollY, this.scroll.scrollY);
+          if(status === 'top') {
+            this.scroll.startToTop(() => {
+              this.scrollTop();
+            });
+          } else if(status === 'bottom') {
+            this.scroll.startToBottom(() => {
+              this.scrollBottom();
+            });
+          }
+        }
+      }
     }, 300);
   }
 
   /**
-   * 当鼠标停下超过500毫秒，将会判断是否触发排序
+   * 当鼠标停下超过300毫秒，将会判断是否触发排序
    */
   resetQuene() {
+    let result = 'none';
     const currentXY = this.positions[this.currentKey];
     const currentTranslate = currentXY.moving || currentXY.translate;
     const currentX = currentXY.left + currentXY.moveX + currentTranslate.x;
@@ -212,6 +278,7 @@ export default class UseDragSort {
         const _y = Math.abs(position.top + translate.y - currentY);
         if (_x <= 30 && _y <= 30) {
           printLog('重新排序：' + this.currentKey + '---to---' + key, 'move-block');
+          result = 'resort';
           // 当往前排时，替换的元素往前挪
           /** 对positions重新排序 **/
           const moveInfo = this.cacheChangePositions(currentKey, key, this.positions);
@@ -228,6 +295,7 @@ export default class UseDragSort {
         }
       }
     });
+    return result;
   }
 
   /**
@@ -351,5 +419,81 @@ export default class UseDragSort {
     this.currentKey = null;
     this.currentDom = null;
     this.domList = [];
+    this.scrollEle = null;
+    this.cacheMove = null;
+    this.fixScrollY = 0;
   }
+
+  /**
+   * 销毁实例缓存
+   */
+  destory() {
+    clearTimeout(this.moveTimer);
+    this.moveTimer = null;
+    this.positions = null;
+    this.currentKey = null;
+    this.currentDom = null;
+    this.domList = [];
+    this.scrollEle = null;
+    this.cacheMove = null;
+    this.fixScrollY = 0;
+    // 全部清除
+    this.el = null;
+    this.scroll = null;
+    
+  }
+}
+
+/**
+ * 查找某一个元素的父级
+ */
+function findParents(Node) {
+  let result = [Node];
+  const target = Node;
+  let parent = target.parentElement;
+  while (parent) {
+    result.push(parent);
+    parent = parent.parentElement;
+  }
+  return result;
+}
+
+// 判定是在底部或是在顶部
+function judgeScroll(p1, p2, fixBottom, fix, scrollY) {
+  const value = p1.y - (p2.y - fix - scrollY);
+  const topValue = p1.y - 60;
+  const bottomValue = 60 + fixBottom;
+  if(value >=  topValue) {
+    return 'top';
+  } else if (value <= bottomValue) {
+    return 'bottom';
+  } else {
+    return 'middle';
+  }
+}
+// 找到当前元素与滚动元素之间所有doms
+function findInDOM(start, end) {
+  let result = [];
+  let parent = start;
+  while(parent && parent !== end) {
+    parent = parent.parentElement;
+    result.push(parent);
+  }
+  return result;
+}
+// 获取dom之间的相对位置
+function getOffsetDOM(start, end, translate) {
+  const parents = findInDOM(start, end);
+  let result = { x: translate.x, y: translate.y };
+  function getOffset(node) {
+    result = {
+      x: node.offsetLeft + result.x,
+      y: node.offsetTop + result.y
+    };
+  }
+  getOffset(start);
+  parents.forEach((dom) => {
+    getOffset(dom);
+  });
+  return result;
 }

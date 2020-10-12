@@ -38,11 +38,13 @@
       }
     </style>
     <div id="app">
-      <div class="wrap">
+      <div class="wrap" scroll="y">
         <div class="box">
-          <div v-for="(item, key) in list" :key="item.name" name="move-block-wp" class="item-box">
-            <div class="item" name="move-block" :move-index="key" :unid="item.name">
-              {{item.name}}
+          <div class="wrap-drag">
+            <div v-for="(item, key) in list" :key="item.name" name="move-block-wp" class="item-box">
+              <div class="item" name="move-block" :move-index="key" :unid="item.name">
+                {{item.name}}
+              </div>
             </div>
           </div>
         </div>
@@ -67,9 +69,14 @@
           };
         },
         mounted: function () {
+          const scrollY = new useMouse.UseScrollY({
+            wrap: document.querySelector('.wrap'),
+            el: document.querySelector('.box')
+          });
           new useMouse.UseDragSort({
-            el: document.querySelector('.wrap'),
+            el: document.querySelector('.wrap-drag'),
             activeClass: 'active-move-block',
+            scroll: scrollY,
             getList: () => {
               return this.list;
             },
@@ -77,9 +84,7 @@
               this.list = list;
             }
           });
-          new useMouse.UseScroll({
-            el: document.querySelector('.box')
-          });
+          
         }
       });
     </script>
