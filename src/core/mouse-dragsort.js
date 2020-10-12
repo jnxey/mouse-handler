@@ -243,9 +243,9 @@ export default class UseDragSort {
           const currentXY = this.positions[this.currentKey];
           const translate = { x: currentXY.moveX, y: currentXY.moveY};
           const offset = getOffsetDOM(this.currentDom, scrollDOM, translate);
-          console.log('scrollRECT' + JSON.stringify(scrollRECT));
-          console.log('offset' + JSON.stringify(offset));
-          console.log('currentDOM' + JSON.stringify(currentDOM.clientHeight));
+          // console.log('scrollRECT' + JSON.stringify(scrollRECT));
+          // console.log('offset' + JSON.stringify(offset));
+          // console.log('currentDOM' + JSON.stringify(currentDOM.clientHeight));
           const status = judgeScroll(scrollRECT, offset, currentDOM.clientHeight, this.fixScrollY, this.scroll.scrollY);
           if(status === 'top') {
             this.scroll.startToTop(() => {

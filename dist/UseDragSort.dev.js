@@ -514,10 +514,9 @@
                 x: currentXY.moveX,
                 y: currentXY.moveY
               };
-              var offset = getOffsetDOM(_this4.currentDom, scrollDOM, translate);
-              console.log('scrollRECT' + JSON.stringify(scrollRECT));
-              console.log('offset' + JSON.stringify(offset));
-              console.log('currentDOM' + JSON.stringify(currentDOM.clientHeight));
+              var offset = getOffsetDOM(_this4.currentDom, scrollDOM, translate); // console.log('scrollRECT' + JSON.stringify(scrollRECT));
+              // console.log('offset' + JSON.stringify(offset));
+              // console.log('currentDOM' + JSON.stringify(currentDOM.clientHeight));
 
               var _status = judgeScroll(scrollRECT, offset, currentDOM.clientHeight, _this4.fixScrollY, _this4.scroll.scrollY);
 
